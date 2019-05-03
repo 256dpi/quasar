@@ -6,7 +6,7 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
-// Table manages the storage of consumer offsets.
+// Table manages the storage of positions in a ledger.
 type Table struct {
 	db *badger.DB
 }
@@ -40,13 +40,13 @@ func OpenTable(dir string) (*Table, error) {
 	return t, nil
 }
 
-// Set will write the specified offset to the table.
-func (t *Table) Set(name string, offset uint64) error {
+// Set will write the specified position to the table.
+func (t *Table) Set(name string, position uint64) error {
 	// set entry
 	err := t.db.Update(func(txn *badger.Txn) error {
 		return txn.SetEntry(&badger.Entry{
 			Key:   []byte(name),
-			Value: EncodeSequence(offset),
+			Value: EncodeSequence(position),
 		})
 	})
 	if err != nil {
@@ -56,10 +56,10 @@ func (t *Table) Set(name string, offset uint64) error {
 	return nil
 }
 
-// Get will read the specified offset from the table.
+// Get will read the specified position from the table.
 func (t *Table) Get(name string) (uint64, bool, error) {
-	// prepare offset & found
-	var offset uint64
+	// prepare position and found
+	var position uint64
 	var found bool
 
 	// prepare error
@@ -77,7 +77,7 @@ func (t *Table) Get(name string) (uint64, bool, error) {
 
 		// parse key
 		err = item.Value(func(val []byte) error {
-			offset, decodeErr = DecodeSequence(val)
+			position, decodeErr = DecodeSequence(val)
 			found = true
 			return nil
 		})
@@ -93,10 +93,10 @@ func (t *Table) Get(name string) (uint64, bool, error) {
 		return 0, false, decodeErr
 	}
 
-	return offset, found, nil
+	return position, found, nil
 }
 
-// Delete will remove the specified offset from the table.
+// Delete will remove the specified position from the table.
 func (t *Table) Delete(name string) error {
 	// delete item
 	err := t.db.Update(func(txn *badger.Txn) error {
@@ -109,7 +109,7 @@ func (t *Table) Delete(name string) error {
 	return nil
 }
 
-// Count will return the number of stored offsets.
+// Count will return the number of stored positions.
 func (t *Table) Count() (uint64, error) {
 	// prepare counter
 	var count uint64
@@ -134,9 +134,9 @@ func (t *Table) Count() (uint64, error) {
 	return count, nil
 }
 
-// Clear will delete all offsets from the table.
+// Clear will delete all positions from the table.
 func (t *Table) Clear() error {
-	// drop all offsets
+	// drop all positions
 	err := t.db.DropAll()
 	if err != nil {
 		return err
