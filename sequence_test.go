@@ -25,7 +25,7 @@ func TestSplitAndJoinSequence(t *testing.T) {
 
 	ts, n := SplitSequence(seq)
 
-	assert.Equal(t, now, ts)
+	assert.Equal(t, now.UTC(), ts.UTC())
 	assert.Equal(t, uint32(42), n)
 }
 
@@ -36,7 +36,7 @@ func TestSequenceProperties(t *testing.T) {
 
 	ts, n = SplitSequence(math.MaxUint64)
 	end, _ := time.Parse(time.RFC3339, "2106-02-07T06:28:15+00:00")
-	assert.True(t, end.Equal(ts))
+	assert.True(t, end.UTC().Equal(ts.UTC()))
 	assert.Equal(t, uint32(math.MaxUint32), n)
 }
 
