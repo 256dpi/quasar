@@ -8,11 +8,11 @@ import (
 )
 
 func TestTable(t *testing.T) {
-	clear("table")
+	tdb := openDB("table", true)
 
 	// open
 
-	table, err := OpenTable(dir("table"))
+	table, err := CreateTable(tdb)
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
@@ -62,40 +62,28 @@ func TestTable(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(1), n)
 
-	// clear
-
-	err = table.Clear()
-	assert.NoError(t, err)
-
-	n, ok, err = table.Get("foo")
-	assert.NoError(t, err)
-	assert.False(t, ok)
-	assert.Equal(t, uint64(0), n)
-
-	n, err = table.Count()
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(0), n)
-
 	// close
 
-	err = table.Close()
+	err = tdb.Close()
 	assert.NoError(t, err)
 }
 
 func TestTableReopen(t *testing.T) {
-	clear("table")
+	tdb := openDB("table", true)
 
-	l, err := OpenTable(dir("table"))
+	l, err := CreateTable(tdb)
 	assert.NoError(t, err)
 	assert.NotNil(t, l)
 
 	err = l.Set("foo", 1)
 	assert.NoError(t, err)
 
-	err = l.Close()
+	err = tdb.Close()
 	assert.NoError(t, err)
 
-	l, err = OpenTable(dir("table"))
+	tdb = openDB("table", false)
+
+	l, err = CreateTable(tdb)
 	assert.NoError(t, err)
 	assert.NotNil(t, l)
 
@@ -104,14 +92,14 @@ func TestTableReopen(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, uint64(1), n)
 
-	err = l.Close()
+	err = tdb.Close()
 	assert.NoError(t, err)
 }
 
 func BenchmarkTableSet(b *testing.B) {
-	clear("table")
+	tdb := openDB("table", true)
 
-	table, err := OpenTable(dir("table"))
+	table, err := CreateTable(tdb)
 	if err != nil {
 		panic(err)
 	}
@@ -130,16 +118,16 @@ func BenchmarkTableSet(b *testing.B) {
 
 	b.StopTimer()
 
-	err = table.Close()
+	err = tdb.Close()
 	if err != nil {
 		panic(err)
 	}
 }
 
 func BenchmarkTableGet(b *testing.B) {
-	clear("table")
+	tdb := openDB("table", true)
 
-	l, err := OpenTable(dir("table"))
+	l, err := CreateTable(tdb)
 	if err != nil {
 		panic(err)
 	}
@@ -163,16 +151,16 @@ func BenchmarkTableGet(b *testing.B) {
 
 	b.StopTimer()
 
-	err = l.Close()
+	err = tdb.Close()
 	if err != nil {
 		panic(err)
 	}
 }
 
 func BenchmarkTableDelete(b *testing.B) {
-	clear("table")
+	tdb := openDB("table", true)
 
-	l, err := OpenTable(dir("table"))
+	l, err := CreateTable(tdb)
 	if err != nil {
 		panic(err)
 	}
@@ -196,7 +184,7 @@ func BenchmarkTableDelete(b *testing.B) {
 
 	b.StopTimer()
 
-	err = l.Close()
+	err = tdb.Close()
 	if err != nil {
 		panic(err)
 	}

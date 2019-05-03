@@ -5,20 +5,26 @@ import (
 	"path/filepath"
 )
 
-func dir(name string) string {
+func openDB(name string, clear bool) *DB {
 	// make dir absolute
 	dir, err := filepath.Abs(filepath.Join("test", name))
 	if err != nil {
 		panic(err)
 	}
 
-	return dir
-}
-
-func clear(name string) {
 	// clear directory
-	err := os.RemoveAll(dir(name))
+	if clear {
+		err = os.RemoveAll(dir)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	// open db
+	db, err := OpenDB(dir)
 	if err != nil {
 		panic(err)
 	}
+
+	return db
 }

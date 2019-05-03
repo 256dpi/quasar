@@ -75,7 +75,7 @@ func consumer(ledger *quasar.Ledger, table *quasar.Table) {
 		ts, _ := time.Parse(time.RFC3339Nano, string(entry.Payload))
 
 		// calculate diff
-		diff := float64(time.Since(ts))/float64(time.Millisecond)
+		diff := float64(time.Since(ts)) / float64(time.Millisecond)
 
 		// increment and save diff
 		mutex.Lock()
@@ -165,14 +165,26 @@ func main() {
 		panic(err)
 	}
 
+	// open ledger db
+	ldb, err := quasar.OpenDB("./data/ledger")
+	if err != nil {
+		panic(err)
+	}
+
+	// open table db
+	tdb, err := quasar.OpenDB("./data/table")
+	if err != nil {
+		panic(err)
+	}
+
 	// open ledger
-	ledger, err := quasar.OpenLedger("./data/ledger")
+	ledger, err := quasar.CreateLedger(ldb)
 	if err != nil {
 		panic(err)
 	}
 
 	// open table
-	table, err := quasar.OpenTable("./data/table")
+	table, err := quasar.CreateTable(tdb)
 	if err != nil {
 		panic(err)
 	}

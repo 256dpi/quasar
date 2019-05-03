@@ -2,7 +2,6 @@ package quasar
 
 import (
 	"bytes"
-	"os"
 	"sync"
 
 	"github.com/dgraph-io/badger"
@@ -16,7 +15,7 @@ type Entry struct {
 
 // Ledger manages the storage of sequential entries.
 type Ledger struct {
-	db *badger.DB
+	db *DB
 
 	receivers sync.Map
 
@@ -25,33 +24,14 @@ type Ledger struct {
 	mutex  sync.Mutex
 }
 
-// OpenLedger will open the ledger in the specified directory. If no ledger
-// exists a new one will be created.
-func OpenLedger(dir string) (*Ledger, error) {
-	// prepare options
-	opts := badger.DefaultOptions
-	opts.Dir = dir
-	opts.ValueDir = dir
-	opts.Logger = nil
-
-	// ensure directory
-	err := os.MkdirAll(dir, 0777)
-	if err != nil {
-		return nil, err
-	}
-
-	// open db
-	db, err := badger.Open(opts)
-	if err != nil {
-		return nil, err
-	}
-
+// CreateLedger will create a ledger that stores entries in the provided db.
+func CreateLedger(db *DB) (*Ledger, error) {
 	// prepare length and head
 	var length int
 	var head uint64
 
 	// count all items and find head
-	err = db.View(func(txn *badger.Txn) error {
+	err := db.View(func(txn *badger.Txn) error {
 		// create iterator (key only)
 		iter := txn.NewIterator(badger.IteratorOptions{})
 		defer iter.Close()
@@ -62,10 +42,13 @@ func OpenLedger(dir string) (*Ledger, error) {
 			length++
 
 			// parse key and set head
-			head, err = DecodeSequence(iter.Item().Key())
+			seq, err := DecodeSequence(iter.Item().Key())
 			if err != nil {
 				return err
 			}
+
+			// set head
+			head = seq
 		}
 
 		return nil
@@ -266,15 +249,4 @@ func (l *Ledger) Subscribe(receiver chan<- uint64) {
 // Unsubscribe will remove a previously subscribed receiver.
 func (l *Ledger) Unsubscribe(receiver chan<- uint64) {
 	l.receivers.Delete(receiver)
-}
-
-// Close will close the ledger.
-func (l *Ledger) Close() error {
-	// close db
-	err := l.db.Close()
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

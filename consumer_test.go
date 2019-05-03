@@ -7,13 +7,13 @@ import (
 )
 
 func TestConsumer(t *testing.T) {
-	clear("ledger")
-	clear("table")
+	ldb := openDB("ledger", true)
+	tdb := openDB("table", true)
 
-	ledger, err := OpenLedger(dir("ledger"))
+	ledger, err := CreateLedger(ldb)
 	assert.NoError(t, err)
 
-	table, err := OpenTable(dir("table"))
+	table, err := CreateTable(tdb)
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -80,4 +80,10 @@ func TestConsumer(t *testing.T) {
 
 	n, _, _ := table.Get("foo")
 	assert.Equal(t, uint64(100), n)
+
+	err = ldb.Close()
+	assert.NoError(t, err)
+
+	err = tdb.Close()
+	assert.NoError(t, err)
 }

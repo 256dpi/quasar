@@ -1,8 +1,6 @@
 package quasar
 
 import (
-	"os"
-
 	"github.com/dgraph-io/badger"
 )
 
@@ -11,27 +9,8 @@ type Table struct {
 	db *badger.DB
 }
 
-// OpenTable will open the table in the specified directory. If no table exists
-// a new one will be created.
-func OpenTable(dir string) (*Table, error) {
-	// prepare options
-	opts := badger.DefaultOptions
-	opts.Dir = dir
-	opts.ValueDir = dir
-	opts.Logger = nil
-
-	// ensure directory
-	err := os.MkdirAll(dir, 0777)
-	if err != nil {
-		return nil, err
-	}
-
-	// open db
-	db, err := badger.Open(opts)
-	if err != nil {
-		return nil, err
-	}
-
+// CreateTable will create a table that stores positions in the provided db.
+func CreateTable(db *DB) (*Table, error) {
 	// create table
 	t := &Table{
 		db: db,
@@ -132,26 +111,4 @@ func (t *Table) Count() (uint64, error) {
 	}
 
 	return count, nil
-}
-
-// Clear will delete all positions from the table.
-func (t *Table) Clear() error {
-	// drop all positions
-	err := t.db.DropAll()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Close will close the table.
-func (t *Table) Close() error {
-	// close db
-	err := t.db.Close()
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

@@ -9,11 +9,11 @@ import (
 )
 
 func TestLedger(t *testing.T) {
-	clear("ledger")
+	ldb := openDB("ledger", true)
 
 	// open
 
-	ledger, err := OpenLedger(dir("ledger"))
+	ledger, err := CreateLedger(ldb)
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -102,24 +102,26 @@ func TestLedger(t *testing.T) {
 
 	// close
 
-	err = ledger.Close()
+	err = ldb.Close()
 	assert.NoError(t, err)
 }
 
 func TestLedgerReopen(t *testing.T) {
-	clear("ledger")
+	ldb := openDB("ledger", true)
 
-	ledger, err := OpenLedger(dir("ledger"))
+	ledger, err := CreateLedger(ldb)
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
 	err = ledger.Write(Entry{Sequence: 1, Payload: []byte("foo")})
 	assert.NoError(t, err)
 
-	err = ledger.Close()
+	err = ldb.Close()
 	assert.NoError(t, err)
 
-	ledger, err = OpenLedger(dir("ledger"))
+	ldb = openDB("ledger", false)
+
+	ledger, err = CreateLedger(ldb)
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -135,14 +137,14 @@ func TestLedgerReopen(t *testing.T) {
 	last := ledger.Head()
 	assert.Equal(t, uint64(1), last)
 
-	err = ledger.Close()
+	err = ldb.Close()
 	assert.NoError(t, err)
 }
 
 func BenchmarkLedgerWrite(b *testing.B) {
-	clear("ledger")
+	ldb := openDB("ledger", true)
 
-	ledger, err := OpenLedger(dir("ledger"))
+	ledger, err := CreateLedger(ldb)
 	if err != nil {
 		panic(err)
 	}
@@ -179,16 +181,16 @@ func BenchmarkLedgerWrite(b *testing.B) {
 
 	b.StopTimer()
 
-	err = ledger.Close()
+	err = ldb.Close()
 	if err != nil {
 		panic(err)
 	}
 }
 
 func BenchmarkLedgerRead(b *testing.B) {
-	clear("ledger")
+	ldb := openDB("ledger", true)
 
-	ledger, err := OpenLedger(dir("ledger"))
+	ledger, err := CreateLedger(ldb)
 	if err != nil {
 		panic(err)
 	}
@@ -220,16 +222,16 @@ func BenchmarkLedgerRead(b *testing.B) {
 
 	b.StopTimer()
 
-	err = ledger.Close()
+	err = ldb.Close()
 	if err != nil {
 		panic(err)
 	}
 }
 
 func BenchmarkLedgerDelete(b *testing.B) {
-	clear("ledger")
+	ldb := openDB("ledger", true)
 
-	ledger, err := OpenLedger(dir("ledger"))
+	ledger, err := CreateLedger(ldb)
 	if err != nil {
 		panic(err)
 	}
@@ -261,7 +263,7 @@ func BenchmarkLedgerDelete(b *testing.B) {
 
 	b.StopTimer()
 
-	err = ledger.Close()
+	err = ldb.Close()
 	if err != nil {
 		panic(err)
 	}
