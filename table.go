@@ -1,19 +1,23 @@
 package quasar
 
 import (
+	"bytes"
+
 	"github.com/dgraph-io/badger"
 )
 
 // Table manages the storage of positions in a ledger.
 type Table struct {
-	db *badger.DB
+	db     *DB
+	prefix []byte
 }
 
 // CreateTable will create a table that stores positions in the provided db.
-func CreateTable(db *DB) (*Table, error) {
+func CreateTable(db *DB, prefix string) (*Table, error) {
 	// create table
 	t := &Table{
-		db: db,
+		db:     db,
+		prefix: append([]byte(prefix), ':'),
 	}
 
 	return t, nil
@@ -24,7 +28,7 @@ func (t *Table) Set(name string, position uint64) error {
 	// set entry
 	err := t.db.Update(func(txn *badger.Txn) error {
 		return txn.SetEntry(&badger.Entry{
-			Key:   []byte(name),
+			Key:   t.makeKey(name),
 			Value: EncodeSequence(position),
 		})
 	})
@@ -47,7 +51,7 @@ func (t *Table) Get(name string) (uint64, bool, error) {
 	// read entries
 	err := t.db.View(func(txn *badger.Txn) error {
 		// get item
-		item, err := txn.Get([]byte(name))
+		item, err := txn.Get(t.makeKey(name))
 		if err == badger.ErrKeyNotFound {
 			return nil
 		} else if err != nil {
@@ -79,7 +83,7 @@ func (t *Table) Get(name string) (uint64, bool, error) {
 func (t *Table) Delete(name string) error {
 	// delete item
 	err := t.db.Update(func(txn *badger.Txn) error {
-		return txn.Delete([]byte(name))
+		return txn.Delete(t.makeKey(name))
 	})
 	if err != nil {
 		return err
@@ -101,7 +105,9 @@ func (t *Table) Count() (uint64, error) {
 
 		// iterate over all keys
 		for iter.Rewind(); iter.Valid(); iter.Next() {
-			count++
+			if bytes.HasPrefix(iter.Item().Key(), t.prefix) {
+				count++
+			}
 		}
 
 		return nil
@@ -111,4 +117,9 @@ func (t *Table) Count() (uint64, error) {
 	}
 
 	return count, nil
+}
+
+func (t *Table) makeKey(name string) []byte {
+	b := make([]byte, 0, len(t.prefix)+len(name))
+	return append(append(b, t.prefix...), []byte(name)...)
 }

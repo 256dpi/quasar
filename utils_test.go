@@ -3,6 +3,8 @@ package quasar
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/dgraph-io/badger"
 )
 
 func openDB(name string, clear bool) *DB {
@@ -27,4 +29,47 @@ func openDB(name string, clear bool) *DB {
 	}
 
 	return db
+}
+
+func set(db *DB, key, value string) {
+	// set entry
+	err := db.Update(func(txn *badger.Txn) error {
+		return txn.SetEntry(&badger.Entry{
+			Key:   []byte(key),
+			Value: []byte(value),
+		})
+	})
+	if err != nil {
+		panic(err)
+	}
+}
+
+func dump(db *DB) map[string]string {
+	// prepare map
+	m := map[string]string{}
+
+	// iterate over all keys
+	err := db.View(func(txn *badger.Txn) error {
+		// create iterator
+		iter := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer iter.Close()
+
+		// iterate over all keys
+		for iter.Rewind(); iter.Valid(); iter.Next() {
+			err := iter.Item().Value(func(val []byte) error {
+				m[string(iter.Item().Key())] = string(val)
+				return nil
+			})
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	return m
 }

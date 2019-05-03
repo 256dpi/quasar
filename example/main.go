@@ -184,7 +184,7 @@ func main() {
 	}
 
 	// open table
-	table, err := quasar.CreateTable(tdb)
+	table, err := quasar.CreateTable(tdb, "table")
 	if err != nil {
 		panic(err)
 	}

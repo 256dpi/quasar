@@ -12,7 +12,7 @@ func TestTable(t *testing.T) {
 
 	// open
 
-	table, err := CreateTable(tdb)
+	table, err := CreateTable(tdb, "table")
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
@@ -34,6 +34,10 @@ func TestTable(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(1), n)
 
+	assert.Equal(t, map[string]string{
+		"table:foo": "00000000000000000001",
+	}, dump(tdb))
+
 	// delete
 
 	err = table.Delete("foo")
@@ -47,6 +51,8 @@ func TestTable(t *testing.T) {
 	n, err = table.Count()
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(0), n)
+
+	assert.Equal(t, map[string]string{}, dump(tdb))
 
 	// reset
 
@@ -62,6 +68,14 @@ func TestTable(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(1), n)
 
+	// count
+
+	set(tdb, "bar", "baz")
+
+	n, err = table.Count()
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(1), n)
+
 	// close
 
 	err = tdb.Close()
@@ -71,7 +85,7 @@ func TestTable(t *testing.T) {
 func TestTableReopen(t *testing.T) {
 	tdb := openDB("table", true)
 
-	l, err := CreateTable(tdb)
+	l, err := CreateTable(tdb, "table")
 	assert.NoError(t, err)
 	assert.NotNil(t, l)
 
@@ -83,7 +97,7 @@ func TestTableReopen(t *testing.T) {
 
 	tdb = openDB("table", false)
 
-	l, err = CreateTable(tdb)
+	l, err = CreateTable(tdb, "table")
 	assert.NoError(t, err)
 	assert.NotNil(t, l)
 
@@ -99,7 +113,7 @@ func TestTableReopen(t *testing.T) {
 func BenchmarkTableSet(b *testing.B) {
 	tdb := openDB("table", true)
 
-	table, err := CreateTable(tdb)
+	table, err := CreateTable(tdb, "table")
 	if err != nil {
 		panic(err)
 	}
@@ -127,7 +141,7 @@ func BenchmarkTableSet(b *testing.B) {
 func BenchmarkTableGet(b *testing.B) {
 	tdb := openDB("table", true)
 
-	l, err := CreateTable(tdb)
+	l, err := CreateTable(tdb, "table")
 	if err != nil {
 		panic(err)
 	}
@@ -160,7 +174,7 @@ func BenchmarkTableGet(b *testing.B) {
 func BenchmarkTableDelete(b *testing.B) {
 	tdb := openDB("table", true)
 
-	l, err := CreateTable(tdb)
+	l, err := CreateTable(tdb, "table")
 	if err != nil {
 		panic(err)
 	}

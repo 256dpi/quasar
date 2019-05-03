@@ -13,7 +13,7 @@ func TestConsumer(t *testing.T) {
 	ledger, err := CreateLedger(ldb)
 	assert.NoError(t, err)
 
-	table, err := CreateTable(tdb)
+	table, err := CreateTable(tdb, "table")
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
