@@ -11,7 +11,7 @@ type Table struct {
 	db *badger.DB
 }
 
-// OpenLedger will open the table in the specified directory. If no table exists
+// OpenTable will open the table in the specified directory. If no table exists
 // a new one will be created.
 func OpenTable(dir string) (*Table, error) {
 	// prepare options
@@ -40,7 +40,7 @@ func OpenTable(dir string) (*Table, error) {
 	return t, nil
 }
 
-// Write will write the specified offset to the table.
+// Set will write the specified offset to the table.
 func (t *Table) Set(name string, offset uint64) error {
 	// set entry
 	err := t.db.Update(func(txn *badger.Txn) error {
