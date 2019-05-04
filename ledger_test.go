@@ -156,16 +156,16 @@ func TestLedgerMonotonicity(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = ledger.Write(Entry{Sequence: 1, Payload: []byte("foo")})
-	assert.Error(t, err)
+	assert.Equal(t, ErrNotMonotonic, err)
 
 	err = ledger.Write(Entry{Sequence: 2, Payload: []byte("foo")})
-	assert.Error(t, err)
+	assert.Equal(t, ErrNotMonotonic, err)
 
 	err = ledger.Write(
 		Entry{Sequence: 4, Payload: []byte("foo")},
 		Entry{Sequence: 3, Payload: []byte("foo")},
 	)
-	assert.Error(t, err)
+	assert.Equal(t, ErrNotMonotonic, err)
 }
 
 func TestLedgerReopen(t *testing.T) {
