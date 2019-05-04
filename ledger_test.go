@@ -46,6 +46,10 @@ func TestLedger(t *testing.T) {
 	last = ledger.Head()
 	assert.Equal(t, uint64(1), last)
 
+	assert.Equal(t, map[string]string{
+		"00000000000000000001": "foo",
+	}, dump(ldb))
+
 	// write multiple
 
 	err = ledger.Write(
@@ -73,6 +77,13 @@ func TestLedger(t *testing.T) {
 	last = ledger.Head()
 	assert.Equal(t, uint64(4), last)
 
+	assert.Equal(t, map[string]string{
+		"00000000000000000001": "foo",
+		"00000000000000000002": "bar",
+		"00000000000000000003": "baz",
+		"00000000000000000004": "baz",
+	}, dump(ldb))
+
 	// read partial
 
 	entries, err = ledger.Read(2, 10)
@@ -99,6 +110,10 @@ func TestLedger(t *testing.T) {
 
 	last = ledger.Head()
 	assert.Equal(t, uint64(4), last)
+
+	assert.Equal(t, map[string]string{
+		"00000000000000000004": "baz",
+	}, dump(ldb))
 
 	// close
 
