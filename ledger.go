@@ -137,18 +137,10 @@ func (l *Ledger) Write(entries ...Entry) error {
 		return err
 	}
 
-	// acquire mutex
+	// set length and head
 	l.mutex.Lock()
-
-	// increment length
 	l.length += len(entries)
-
-	// set head sequence
-	if head > l.head {
-		l.head = head
-	}
-
-	// release mutex
+	l.head = head
 	l.mutex.Unlock()
 
 	// send notifications to all receivers and skip full receivers
