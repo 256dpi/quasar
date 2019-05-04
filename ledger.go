@@ -58,6 +58,11 @@ func (l *Ledger) init() error {
 
 		// iterate over all keys
 		for iter.Seek(start); iter.Valid(); iter.Next() {
+			// stop if prefix does not match
+			if !bytes.HasPrefix(iter.Item().Key(), l.prefix) {
+				break
+			}
+
 			// increment length
 			length++
 
@@ -161,6 +166,11 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 
 		// iterate until enough entries have been loaded
 		for iter.Seek(start); iter.Valid() && len(list) < amount; iter.Next() {
+			// stop if prefix does not match
+			if !bytes.HasPrefix(iter.Item().Key(), l.prefix) {
+				break
+			}
+
 			// copy values
 			pld, err := iter.Item().ValueCopy(nil)
 			if err != nil {
@@ -207,6 +217,11 @@ func (l *Ledger) Delete(sequence uint64) error {
 
 		// delete all entries
 		for iter.Seek(start); iter.Valid(); iter.Next() {
+			// stop if prefix does not match
+			if !bytes.HasPrefix(iter.Item().Key(), l.prefix) {
+				break
+			}
+
 			// delete entry
 			err := txn.Delete(iter.Item().KeyCopy(nil))
 			if err != nil {

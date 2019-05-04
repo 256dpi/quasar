@@ -85,7 +85,7 @@ func TestTableIsolation(t *testing.T) {
 
 	set(tdb, "foo", "00000000000000000001")
 	set(tdb, "table:foo", "00000000000000000002")
-	set(tdb, "tbl:foo", "00000000000000000003")
+	set(tdb, "z-table:foo", "00000000000000000003")
 
 	table, err := CreateTable(tdb, "table")
 	assert.NoError(t, err)

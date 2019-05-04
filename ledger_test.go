@@ -126,7 +126,7 @@ func TestLedgerIsolation(t *testing.T) {
 
 	set(ldb, "00000000000000000001", "foo")
 	set(ldb, "ledger:00000000000000000002", "bar")
-	set(ldb, "ldg:00000000000000000003", "baz")
+	set(ldb, "z-ledger:00000000000000000003", "baz")
 
 	ledger, err := CreateLedger(ldb, "ledger")
 	assert.NoError(t, err)

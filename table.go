@@ -103,11 +103,18 @@ func (t *Table) Count() (int, error) {
 		iter := txn.NewIterator(badger.IteratorOptions{})
 		defer iter.Close()
 
+		// compute start
+		start := t.makeKey("")
+
 		// iterate over all keys
-		for iter.Rewind(); iter.Valid(); iter.Next() {
-			if bytes.HasPrefix(iter.Item().Key(), t.prefix) {
-				count++
+		for iter.Seek(start); iter.Valid(); iter.Next() {
+			// stop if key does not match prefix
+			if !bytes.HasPrefix(iter.Item().Key(), t.prefix) {
+				break
 			}
+
+			// increment counter
+			count++
 		}
 
 		return nil
