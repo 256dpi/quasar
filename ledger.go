@@ -27,6 +27,9 @@ type Ledger struct {
 
 // CreateLedger will create a ledger that stores entries in the provided db.
 func CreateLedger(db *DB, prefix string) (*Ledger, error) {
+	// compute prefix
+	pfx := append([]byte(prefix), ':')
+
 	// prepare length and head
 	var length int
 	var head uint64
@@ -43,7 +46,7 @@ func CreateLedger(db *DB, prefix string) (*Ledger, error) {
 			length++
 
 			// parse key and set head
-			seq, err := DecodeSequence(iter.Item().Key())
+			seq, err := DecodeSequence(iter.Item().Key()[len(pfx):])
 			if err != nil {
 				return err
 			}
@@ -61,7 +64,7 @@ func CreateLedger(db *DB, prefix string) (*Ledger, error) {
 	// create ledger
 	l := &Ledger{
 		db:     db,
-		prefix: append([]byte(prefix), ':'),
+		prefix: pfx,
 		length: length,
 		head:   head,
 	}
