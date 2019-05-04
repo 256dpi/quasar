@@ -10,7 +10,7 @@ func TestConsumer(t *testing.T) {
 	ldb := openDB("ledger", true)
 	tdb := openDB("table", true)
 
-	ledger, err := CreateLedger(ldb)
+	ledger, err := CreateLedger(ldb, "ledger")
 	assert.NoError(t, err)
 
 	table, err := CreateTable(tdb, "table")

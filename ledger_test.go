@@ -13,7 +13,7 @@ func TestLedger(t *testing.T) {
 
 	// open
 
-	ledger, err := CreateLedger(ldb)
+	ledger, err := CreateLedger(ldb, "ledger")
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -47,7 +47,7 @@ func TestLedger(t *testing.T) {
 	assert.Equal(t, uint64(1), last)
 
 	assert.Equal(t, map[string]string{
-		"00000000000000000001": "foo",
+		"ledger:00000000000000000001": "foo",
 	}, dump(ldb))
 
 	// write multiple
@@ -78,10 +78,10 @@ func TestLedger(t *testing.T) {
 	assert.Equal(t, uint64(4), last)
 
 	assert.Equal(t, map[string]string{
-		"00000000000000000001": "foo",
-		"00000000000000000002": "bar",
-		"00000000000000000003": "baz",
-		"00000000000000000004": "baz",
+		"ledger:00000000000000000001": "foo",
+		"ledger:00000000000000000002": "bar",
+		"ledger:00000000000000000003": "baz",
+		"ledger:00000000000000000004": "baz",
 	}, dump(ldb))
 
 	// read partial
@@ -112,7 +112,7 @@ func TestLedger(t *testing.T) {
 	assert.Equal(t, uint64(4), last)
 
 	assert.Equal(t, map[string]string{
-		"00000000000000000004": "baz",
+		"ledger:00000000000000000004": "baz",
 	}, dump(ldb))
 
 	// close
@@ -124,7 +124,7 @@ func TestLedger(t *testing.T) {
 func TestLedgerReopen(t *testing.T) {
 	ldb := openDB("ledger", true)
 
-	ledger, err := CreateLedger(ldb)
+	ledger, err := CreateLedger(ldb, "ledger")
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -136,7 +136,7 @@ func TestLedgerReopen(t *testing.T) {
 
 	ldb = openDB("ledger", false)
 
-	ledger, err = CreateLedger(ldb)
+	ledger, err = CreateLedger(ldb, "ledger")
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -159,7 +159,7 @@ func TestLedgerReopen(t *testing.T) {
 func BenchmarkLedgerWrite(b *testing.B) {
 	ldb := openDB("ledger", true)
 
-	ledger, err := CreateLedger(ldb)
+	ledger, err := CreateLedger(ldb, "ledger")
 	if err != nil {
 		panic(err)
 	}
@@ -205,7 +205,7 @@ func BenchmarkLedgerWrite(b *testing.B) {
 func BenchmarkLedgerRead(b *testing.B) {
 	ldb := openDB("ledger", true)
 
-	ledger, err := CreateLedger(ldb)
+	ledger, err := CreateLedger(ldb, "ledger")
 	if err != nil {
 		panic(err)
 	}
@@ -246,7 +246,7 @@ func BenchmarkLedgerRead(b *testing.B) {
 func BenchmarkLedgerDelete(b *testing.B) {
 	ldb := openDB("ledger", true)
 
-	ledger, err := CreateLedger(ldb)
+	ledger, err := CreateLedger(ldb, "ledger")
 	if err != nil {
 		panic(err)
 	}

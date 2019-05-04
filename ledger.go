@@ -15,7 +15,8 @@ type Entry struct {
 
 // Ledger manages the storage of sequential entries.
 type Ledger struct {
-	db *DB
+	db     *DB
+	prefix []byte
 
 	receivers sync.Map
 
@@ -25,7 +26,7 @@ type Ledger struct {
 }
 
 // CreateLedger will create a ledger that stores entries in the provided db.
-func CreateLedger(db *DB) (*Ledger, error) {
+func CreateLedger(db *DB, prefix string) (*Ledger, error) {
 	// prepare length and head
 	var length int
 	var head uint64
@@ -60,6 +61,7 @@ func CreateLedger(db *DB) (*Ledger, error) {
 	// create ledger
 	l := &Ledger{
 		db:     db,
+		prefix: append([]byte(prefix), ':'),
 		length: length,
 		head:   head,
 	}
@@ -86,7 +88,7 @@ func (l *Ledger) Write(entries ...Entry) error {
 		for _, entry := range entries {
 			// add entry
 			err := txn.SetEntry(&badger.Entry{
-				Key:   EncodeSequence(entry.Sequence),
+				Key:   l.makeKey(entry.Sequence),
 				Value: entry.Payload,
 			})
 			if err != nil {
@@ -139,11 +141,11 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 		iter := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer iter.Close()
 
-		// seek to first entry
-		iter.Seek(EncodeSequence(sequence))
+		// compute start
+		start := l.makeKey(sequence)
 
 		// iterate until enough entries have been loaded
-		for ; iter.Valid() && len(list) < amount; iter.Next() {
+		for iter.Seek(start); iter.Valid() && len(list) < amount; iter.Next() {
 			// copy values
 			pld, err := iter.Item().ValueCopy(nil)
 			if err != nil {
@@ -151,7 +153,7 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 			}
 
 			// parse key
-			seq, err := DecodeSequence(iter.Item().Key())
+			seq, err := DecodeSequence(iter.Item().Key()[len(l.prefix):])
 			if err != nil {
 				return err
 			}
@@ -184,11 +186,12 @@ func (l *Ledger) Delete(sequence uint64) error {
 		iter := txn.NewIterator(badger.IteratorOptions{})
 		defer iter.Close()
 
-		// get needle
-		needle := EncodeSequence(sequence)
+		// compute start and needle
+		start := l.makeKey(0)
+		needle := l.makeKey(sequence)
 
 		// delete all entries
-		for iter.Rewind(); iter.Valid(); iter.Next() {
+		for iter.Seek(start); iter.Valid(); iter.Next() {
 			// delete entry
 			err := txn.Delete(iter.Item().KeyCopy(nil))
 			if err != nil {
@@ -249,4 +252,9 @@ func (l *Ledger) Subscribe(receiver chan<- uint64) {
 // Unsubscribe will remove a previously subscribed receiver.
 func (l *Ledger) Unsubscribe(receiver chan<- uint64) {
 	l.receivers.Delete(receiver)
+}
+
+func (l *Ledger) makeKey(seq uint64) []byte {
+	b := make([]byte, 0, len(l.prefix)+SequenceLength)
+	return append(append(b, l.prefix...), EncodeSequence(seq)...)
 }

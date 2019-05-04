@@ -11,6 +11,9 @@ var seconds int64
 var counter uint32
 var mutex sync.Mutex
 
+// SequenceLength defines the encoded length of a sequence.
+const SequenceLength = 20
+
 // GenerateSequence will generate a locally monotonic sequence that consists of
 // the current time and an ordinal number. The returned sequence is the first of
 // n consecutive numbers and will either overflow in 2106 or if generated more

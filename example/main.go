@@ -178,7 +178,7 @@ func main() {
 	}
 
 	// open ledger
-	ledger, err := quasar.CreateLedger(ldb)
+	ledger, err := quasar.CreateLedger(ldb, "ledger")
 	if err != nil {
 		panic(err)
 	}

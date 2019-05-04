@@ -10,7 +10,7 @@ import (
 func TestProducer(t *testing.T) {
 	ldb := openDB("ledger", true)
 
-	ledger, err := CreateLedger(ldb)
+	ledger, err := CreateLedger(ldb, "ledger")
 	assert.NoError(t, err)
 
 	done := make(chan struct{})
@@ -45,7 +45,7 @@ func TestProducer(t *testing.T) {
 func BenchmarkProducer(b *testing.B) {
 	ldb := openDB("ledger", true)
 
-	ledger, err := CreateLedger(ldb)
+	ledger, err := CreateLedger(ldb, "ledger")
 	if err != nil {
 		panic(err)
 	}

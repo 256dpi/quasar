@@ -9,7 +9,7 @@ import (
 func TestReader(t *testing.T) {
 	ldb := openDB("ledger", true)
 
-	ledger, err := CreateLedger(ldb)
+	ledger, err := CreateLedger(ldb, "ledger")
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
