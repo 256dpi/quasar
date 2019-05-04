@@ -145,6 +145,29 @@ func TestLedgerIsolation(t *testing.T) {
 	assert.Equal(t, uint64(2), head)
 }
 
+func TestLedgerMonotonicity(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, "ledger")
+	assert.NoError(t, err)
+	assert.NotNil(t, ledger)
+
+	err = ledger.Write(Entry{Sequence: 2, Payload: []byte("foo")})
+	assert.NoError(t, err)
+
+	err = ledger.Write(Entry{Sequence: 1, Payload: []byte("foo")})
+	assert.Error(t, err)
+
+	err = ledger.Write(Entry{Sequence: 2, Payload: []byte("foo")})
+	assert.Error(t, err)
+
+	err = ledger.Write(
+		Entry{Sequence: 4, Payload: []byte("foo")},
+		Entry{Sequence: 3, Payload: []byte("foo")},
+	)
+	assert.Error(t, err)
+}
+
 func TestLedgerReopen(t *testing.T) {
 	db := openDB(true)
 

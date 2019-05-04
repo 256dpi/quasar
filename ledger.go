@@ -2,10 +2,14 @@ package quasar
 
 import (
 	"bytes"
+	"errors"
 	"sync"
 
 	"github.com/dgraph-io/badger"
 )
+
+// ErrNotMonotonic is returned for write attempts that are not monotonic.
+var ErrNotMonotonic = errors.New("not monotonic")
 
 // Entry is a single entry in the ledger.
 type Entry struct {
@@ -92,19 +96,25 @@ func (l *Ledger) init() error {
 }
 
 // Write will write the specified entries to the ledger. No entries have been
-// written if an error has been returned. It is the callers responsibility to
-// arrange for monotonicity in the sequence of the written entries.
+// written if an error has been returned. Monotonicity of the written entries
+// is checked against the current head.
 func (l *Ledger) Write(entries ...Entry) error {
 	// acquire mutex
 	l.writeMutex.Lock()
 	defer l.writeMutex.Unlock()
 
-	// collect head
-	var head uint64
+	// get head
+	head := l.Head()
+
+	// check and collect head
 	for _, entry := range entries {
-		if entry.Sequence > head {
-			head = entry.Sequence
+		// return immediately if not monotonic
+		if entry.Sequence <= head {
+			return ErrNotMonotonic
 		}
+
+		// set head
+		head = entry.Sequence
 	}
 
 	// begin database update
