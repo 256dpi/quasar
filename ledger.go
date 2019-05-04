@@ -23,6 +23,8 @@ type Ledger struct {
 	length int
 	head   uint64
 	mutex  sync.Mutex
+
+	writeMutex sync.Mutex
 }
 
 // CreateLedger will create a ledger that stores entries in the provided db.
@@ -91,9 +93,12 @@ func (l *Ledger) init() error {
 
 // Write will write the specified entries to the ledger. No entries have been
 // written if an error has been returned. It is the callers responsibility to
-// arrange for monotonicity in the sequence of the written entries. Ideally,
-// only one goroutine is writing entries at the same time.
+// arrange for monotonicity in the sequence of the written entries.
 func (l *Ledger) Write(entries ...Entry) error {
+	// acquire mutex
+	l.writeMutex.Lock()
+	defer l.writeMutex.Unlock()
+
 	// collect head
 	var head uint64
 	for _, entry := range entries {
