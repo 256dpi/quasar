@@ -27,26 +27,42 @@ type Ledger struct {
 
 // CreateLedger will create a ledger that stores entries in the provided db.
 func CreateLedger(db *DB, prefix string) (*Ledger, error) {
-	// compute prefix
-	pfx := append([]byte(prefix), ':')
+	// create ledger
+	l := &Ledger{
+		db:     db,
+		prefix: append([]byte(prefix), ':'),
+	}
 
+	// init ledger
+	err := l.init()
+	if err != nil {
+		return nil, err
+	}
+
+	return l, nil
+}
+
+func (l *Ledger) init() error {
 	// prepare length and head
 	var length int
 	var head uint64
 
 	// count all items and find head
-	err := db.View(func(txn *badger.Txn) error {
+	err := l.db.View(func(txn *badger.Txn) error {
 		// create iterator (key only)
 		iter := txn.NewIterator(badger.IteratorOptions{})
 		defer iter.Close()
 
+		// compute start
+		start := l.makeKey(0)
+
 		// iterate over all keys
-		for iter.Rewind(); iter.Valid(); iter.Next() {
+		for iter.Seek(start); iter.Valid(); iter.Next() {
 			// increment length
 			length++
 
 			// parse key and set head
-			seq, err := DecodeSequence(iter.Item().Key()[len(pfx):])
+			seq, err := DecodeSequence(iter.Item().Key()[len(l.prefix):])
 			if err != nil {
 				return err
 			}
@@ -58,18 +74,14 @@ func CreateLedger(db *DB, prefix string) (*Ledger, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// create ledger
-	l := &Ledger{
-		db:     db,
-		prefix: pfx,
-		length: length,
-		head:   head,
-	}
+	// set length and head
+	l.length = length
+	l.head = head
 
-	return l, nil
+	return nil
 }
 
 // Write will write the specified entries to the ledger. No entries have been

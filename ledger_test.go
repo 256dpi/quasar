@@ -121,6 +121,30 @@ func TestLedger(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestLedgerIsolation(t *testing.T) {
+	ldb := openDB("ledger", true)
+
+	set(ldb, "00000000000000000001", "foo")
+	set(ldb, "ledger:00000000000000000002", "bar")
+	set(ldb, "ldg:00000000000000000003", "baz")
+
+	ledger, err := CreateLedger(ldb, "ledger")
+	assert.NoError(t, err)
+	assert.NotNil(t, ledger)
+
+	entries, err := ledger.Read(0, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, []Entry{
+		{Sequence: 2, Payload: []byte("bar")},
+	}, entries)
+
+	length := ledger.Length()
+	assert.Equal(t, 1, length)
+
+	head := ledger.Head()
+	assert.Equal(t, uint64(2), head)
+}
+
 func TestLedgerReopen(t *testing.T) {
 	ldb := openDB("ledger", true)
 
