@@ -70,8 +70,6 @@ func TestTable(t *testing.T) {
 
 	// count
 
-	set(tdb, "bar", "baz")
-
 	n, err = table.Count()
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(1), n)
@@ -80,6 +78,27 @@ func TestTable(t *testing.T) {
 
 	err = tdb.Close()
 	assert.NoError(t, err)
+}
+
+func TestTableIsolation(t *testing.T) {
+	tdb := openDB("table", true)
+
+	set(tdb, "foo", "00000000000000000001")
+	set(tdb, "table:foo", "00000000000000000002")
+	set(tdb, "tbl:foo", "00000000000000000003")
+
+	table, err := CreateTable(tdb, "table")
+	assert.NoError(t, err)
+	assert.NotNil(t, table)
+
+	n, err := table.Count()
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(1), n)
+
+	n, ok, err := table.Get("foo")
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, uint64(2), n)
 }
 
 func TestTableReopen(t *testing.T) {
