@@ -93,9 +93,9 @@ func (t *Table) Delete(name string) error {
 }
 
 // Count will return the number of stored positions.
-func (t *Table) Count() (uint64, error) {
+func (t *Table) Count() (int, error) {
 	// prepare counter
-	var count uint64
+	var count int
 
 	// iterate over all keys
 	err := t.db.View(func(txn *badger.Txn) error {

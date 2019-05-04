@@ -16,23 +16,23 @@ func TestTable(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
-	n, err := table.Count()
+	count, err := table.Count()
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(0), n)
+	assert.Equal(t, 0, count)
 
 	// set
 
 	err = table.Set("foo", 1)
 	assert.NoError(t, err)
 
-	n, ok, err := table.Get("foo")
+	position, ok, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.True(t, ok)
-	assert.Equal(t, uint64(1), n)
+	assert.Equal(t, uint64(1), position)
 
-	n, err = table.Count()
+	count, err = table.Count()
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), n)
+	assert.Equal(t, 1, count)
 
 	assert.Equal(t, map[string]string{
 		"table:foo": "00000000000000000001",
@@ -43,14 +43,14 @@ func TestTable(t *testing.T) {
 	err = table.Delete("foo")
 	assert.NoError(t, err)
 
-	n, ok, err = table.Get("foo")
+	position, ok, err = table.Get("foo")
 	assert.NoError(t, err)
 	assert.False(t, ok)
-	assert.Equal(t, uint64(0), n)
+	assert.Equal(t, uint64(0), position)
 
-	n, err = table.Count()
+	count, err = table.Count()
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(0), n)
+	assert.Equal(t, 0, count)
 
 	assert.Equal(t, map[string]string{}, dump(tdb))
 
@@ -59,20 +59,20 @@ func TestTable(t *testing.T) {
 	err = table.Set("foo", 1)
 	assert.NoError(t, err)
 
-	n, ok, err = table.Get("foo")
+	position, ok, err = table.Get("foo")
 	assert.NoError(t, err)
 	assert.True(t, ok)
-	assert.Equal(t, uint64(1), n)
+	assert.Equal(t, uint64(1), position)
 
-	n, err = table.Count()
+	count, err = table.Count()
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), n)
+	assert.Equal(t, 1, count)
 
 	// count
 
-	n, err = table.Count()
+	count, err = table.Count()
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), n)
+	assert.Equal(t, 1, count)
 
 	// close
 
@@ -91,24 +91,24 @@ func TestTableIsolation(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
-	n, err := table.Count()
+	count, err := table.Count()
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), n)
+	assert.Equal(t, 1, count)
 
-	n, ok, err := table.Get("foo")
+	position, ok, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.True(t, ok)
-	assert.Equal(t, uint64(2), n)
+	assert.Equal(t, uint64(2), position)
 }
 
 func TestTableReopen(t *testing.T) {
 	tdb := openDB("table", true)
 
-	l, err := CreateTable(tdb, "table")
+	table, err := CreateTable(tdb, "table")
 	assert.NoError(t, err)
-	assert.NotNil(t, l)
+	assert.NotNil(t, table)
 
-	err = l.Set("foo", 1)
+	err = table.Set("foo", 1)
 	assert.NoError(t, err)
 
 	err = tdb.Close()
@@ -116,14 +116,14 @@ func TestTableReopen(t *testing.T) {
 
 	tdb = openDB("table", false)
 
-	l, err = CreateTable(tdb, "table")
+	table, err = CreateTable(tdb, "table")
 	assert.NoError(t, err)
-	assert.NotNil(t, l)
+	assert.NotNil(t, table)
 
-	n, ok, err := l.Get("foo")
+	position, ok, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.True(t, ok)
-	assert.Equal(t, uint64(1), n)
+	assert.Equal(t, uint64(1), position)
 
 	err = tdb.Close()
 	assert.NoError(t, err)
