@@ -22,13 +22,12 @@ type Ledger struct {
 	db     *DB
 	prefix []byte
 
-	receivers sync.Map
+	receivers  sync.Map
+	writeMutex sync.Mutex
 
 	length int
 	head   uint64
 	mutex  sync.Mutex
-
-	writeMutex sync.Mutex
 }
 
 // CreateLedger will create a ledger that stores entries in the provided db.
