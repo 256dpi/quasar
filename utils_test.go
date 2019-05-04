@@ -7,9 +7,9 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
-func openDB(name string, clear bool) *DB {
+func openDB(clear bool) *DB {
 	// make dir absolute
-	dir, err := filepath.Abs(filepath.Join("test", name))
+	dir, err := filepath.Abs(filepath.Join("test"))
 	if err != nil {
 		panic(err)
 	}

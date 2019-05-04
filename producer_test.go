@@ -8,9 +8,9 @@ import (
 )
 
 func TestProducer(t *testing.T) {
-	ldb := openDB("ledger", true)
+	db := openDB(true)
 
-	ledger, err := CreateLedger(ldb, "ledger")
+	ledger, err := CreateLedger(db, "ledger")
 	assert.NoError(t, err)
 
 	done := make(chan struct{})
@@ -38,14 +38,14 @@ func TestProducer(t *testing.T) {
 	n := ledger.Length()
 	assert.Equal(t, 20, n)
 
-	err = ldb.Close()
+	err = db.Close()
 	assert.NoError(t, err)
 }
 
 func BenchmarkProducer(b *testing.B) {
-	ldb := openDB("ledger", true)
+	db := openDB(true)
 
-	ledger, err := CreateLedger(ldb, "ledger")
+	ledger, err := CreateLedger(db, "ledger")
 	if err != nil {
 		panic(err)
 	}
@@ -78,7 +78,7 @@ func BenchmarkProducer(b *testing.B) {
 
 	producer.Close()
 
-	err = ldb.Close()
+	err = db.Close()
 	if err != nil {
 		panic(err)
 	}

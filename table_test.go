@@ -8,11 +8,11 @@ import (
 )
 
 func TestTable(t *testing.T) {
-	tdb := openDB("table", true)
+	db := openDB(true)
 
 	// open
 
-	table, err := CreateTable(tdb, "table")
+	table, err := CreateTable(db, "table")
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
@@ -36,7 +36,7 @@ func TestTable(t *testing.T) {
 
 	assert.Equal(t, map[string]string{
 		"table:foo": "00000000000000000001",
-	}, dump(tdb))
+	}, dump(db))
 
 	// delete
 
@@ -52,7 +52,7 @@ func TestTable(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, count)
 
-	assert.Equal(t, map[string]string{}, dump(tdb))
+	assert.Equal(t, map[string]string{}, dump(db))
 
 	// reset
 
@@ -76,18 +76,18 @@ func TestTable(t *testing.T) {
 
 	// close
 
-	err = tdb.Close()
+	err = db.Close()
 	assert.NoError(t, err)
 }
 
 func TestTableIsolation(t *testing.T) {
-	tdb := openDB("table", true)
+	db := openDB(true)
 
-	set(tdb, "foo", "00000000000000000001")
-	set(tdb, "table:foo", "00000000000000000002")
-	set(tdb, "z-table:foo", "00000000000000000003")
+	set(db, "foo", "00000000000000000001")
+	set(db, "table:foo", "00000000000000000002")
+	set(db, "z-table:foo", "00000000000000000003")
 
-	table, err := CreateTable(tdb, "table")
+	table, err := CreateTable(db, "table")
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
@@ -102,21 +102,21 @@ func TestTableIsolation(t *testing.T) {
 }
 
 func TestTableReopen(t *testing.T) {
-	tdb := openDB("table", true)
+	db := openDB(true)
 
-	table, err := CreateTable(tdb, "table")
+	table, err := CreateTable(db, "table")
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
 	err = table.Set("foo", 1)
 	assert.NoError(t, err)
 
-	err = tdb.Close()
+	err = db.Close()
 	assert.NoError(t, err)
 
-	tdb = openDB("table", false)
+	db = openDB(false)
 
-	table, err = CreateTable(tdb, "table")
+	table, err = CreateTable(db, "table")
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
@@ -125,14 +125,14 @@ func TestTableReopen(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, uint64(1), position)
 
-	err = tdb.Close()
+	err = db.Close()
 	assert.NoError(t, err)
 }
 
 func BenchmarkTableSet(b *testing.B) {
-	tdb := openDB("table", true)
+	db := openDB(true)
 
-	table, err := CreateTable(tdb, "table")
+	table, err := CreateTable(db, "table")
 	if err != nil {
 		panic(err)
 	}
@@ -151,16 +151,16 @@ func BenchmarkTableSet(b *testing.B) {
 
 	b.StopTimer()
 
-	err = tdb.Close()
+	err = db.Close()
 	if err != nil {
 		panic(err)
 	}
 }
 
 func BenchmarkTableGet(b *testing.B) {
-	tdb := openDB("table", true)
+	db := openDB(true)
 
-	l, err := CreateTable(tdb, "table")
+	l, err := CreateTable(db, "table")
 	if err != nil {
 		panic(err)
 	}
@@ -184,16 +184,16 @@ func BenchmarkTableGet(b *testing.B) {
 
 	b.StopTimer()
 
-	err = tdb.Close()
+	err = db.Close()
 	if err != nil {
 		panic(err)
 	}
 }
 
 func BenchmarkTableDelete(b *testing.B) {
-	tdb := openDB("table", true)
+	db := openDB(true)
 
-	l, err := CreateTable(tdb, "table")
+	l, err := CreateTable(db, "table")
 	if err != nil {
 		panic(err)
 	}
@@ -217,7 +217,7 @@ func BenchmarkTableDelete(b *testing.B) {
 
 	b.StopTimer()
 
-	err = tdb.Close()
+	err = db.Close()
 	if err != nil {
 		panic(err)
 	}

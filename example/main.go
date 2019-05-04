@@ -165,26 +165,20 @@ func main() {
 		panic(err)
 	}
 
-	// open ledger db
-	ldb, err := quasar.OpenDB("./data/ledger")
-	if err != nil {
-		panic(err)
-	}
-
-	// open table db
-	tdb, err := quasar.OpenDB("./data/table")
+	// open db
+	db, err := quasar.OpenDB(dir)
 	if err != nil {
 		panic(err)
 	}
 
 	// open ledger
-	ledger, err := quasar.CreateLedger(ldb, "ledger")
+	ledger, err := quasar.CreateLedger(db, "ledger")
 	if err != nil {
 		panic(err)
 	}
 
 	// open table
-	table, err := quasar.CreateTable(tdb, "table")
+	table, err := quasar.CreateTable(db, "table")
 	if err != nil {
 		panic(err)
 	}
