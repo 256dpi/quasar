@@ -302,8 +302,8 @@ func BenchmarkLedgerWrite(b *testing.B) {
 
 	batch := make([]Entry, 0, size)
 
-	for i := 0; i < b.N; i++ {
-		batch = append(batch, Entry{Sequence: uint64(b.N), Payload: payload})
+	for i := 1; i <= b.N; i++ {
+		batch = append(batch, Entry{Sequence: uint64(i), Payload: payload})
 
 		if len(batch) == size {
 			err = ledger.Write(batch...)
@@ -344,7 +344,7 @@ func BenchmarkLedgerRead(b *testing.B) {
 	payload := []byte("hello world!")
 
 	batch := make([]Entry, 0, size)
-	for i := 0; i < size; i++ {
+	for i := 1; i <= size; i++ {
 		batch = append(batch, Entry{Sequence: uint64(i), Payload: payload})
 	}
 
@@ -385,7 +385,7 @@ func BenchmarkLedgerDelete(b *testing.B) {
 	payload := []byte("hello world!")
 
 	batch := make([]Entry, 0, size)
-	for i := 0; i < size; i++ {
+	for i := 1; i <= size; i++ {
 		batch = append(batch, Entry{Sequence: uint64(i), Payload: payload})
 	}
 
