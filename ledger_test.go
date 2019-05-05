@@ -208,7 +208,7 @@ func TestLedgerClear(t *testing.T) {
 	assert.Equal(t, uint64(4), head)
 
 	assert.Equal(t, map[string]string{
-		"ledger:!head":   "4",
+		"ledger:!head": "4",
 	}, dump(db))
 
 	err = db.Close()
