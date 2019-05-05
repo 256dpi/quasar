@@ -126,6 +126,49 @@ func TestLedger(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestLedgerIndex(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, "ledger")
+	assert.NoError(t, err)
+	assert.NotNil(t, ledger)
+
+	index, err := ledger.Index(0)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0), index)
+
+	index, err = ledger.Index(2)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0), index)
+
+	index, err = ledger.Index(-2)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0), index)
+
+	err = ledger.Write(
+		Entry{Sequence: 1, Payload: []byte("foo")},
+		Entry{Sequence: 2, Payload: []byte("bar")},
+		Entry{Sequence: 3, Payload: []byte("baz")},
+		Entry{Sequence: 4, Payload: []byte("qux")},
+	)
+	assert.NoError(t, err)
+
+	index, err = ledger.Index(0)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(1), index)
+
+	index, err = ledger.Index(2)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(3), index)
+
+	index, err = ledger.Index(-2)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(3), index)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func TestLedgerClear(t *testing.T) {
 	db := openDB(true)
 
@@ -159,6 +202,9 @@ func TestLedgerClear(t *testing.T) {
 	assert.Equal(t, map[string]string{
 		"ledger:!head":   "4",
 	}, dump(db))
+
+	err = db.Close()
+	assert.NoError(t, err)
 }
 
 func TestLedgerReset(t *testing.T) {
@@ -192,6 +238,9 @@ func TestLedgerReset(t *testing.T) {
 	assert.Equal(t, uint64(0), head)
 
 	assert.Equal(t, map[string]string{}, dump(db))
+
+	err = db.Close()
+	assert.NoError(t, err)
 }
 
 func TestLedgerIsolation(t *testing.T) {
@@ -219,6 +268,9 @@ func TestLedgerIsolation(t *testing.T) {
 
 	head := ledger.Head()
 	assert.Equal(t, uint64(3), head)
+
+	err = db.Close()
+	assert.NoError(t, err)
 }
 
 func TestLedgerMonotonicity(t *testing.T) {
@@ -242,6 +294,9 @@ func TestLedgerMonotonicity(t *testing.T) {
 		Entry{Sequence: 3, Payload: []byte("foo")},
 	)
 	assert.Equal(t, ErrNotMonotonic, err)
+
+	err = db.Close()
+	assert.NoError(t, err)
 }
 
 func TestLedgerReopen(t *testing.T) {

@@ -3,6 +3,7 @@ package quasar
 import (
 	"bytes"
 	"errors"
+	"math"
 	"strconv"
 	"sync"
 
@@ -238,6 +239,74 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 	}
 
 	return list, nil
+}
+
+// Index will return the sequence of the specified index in the ledger. Negative
+// indexes are counted backwards from the head.
+func (l *Ledger) Index(index int) (uint64, error) {
+	// compute direction
+	backward := index < 0
+
+	// make absolute if backward
+	if backward {
+		index *= -1
+		index--
+	}
+
+	// prepare sequence
+	var sequence uint64
+
+	// read length and head from entries and cache
+	err := l.db.View(func(txn *badger.Txn) error {
+		// create iterator (key only)
+		iter := txn.NewIterator(badger.IteratorOptions{
+			Reverse: backward,
+		})
+		defer iter.Close()
+
+		// compute start
+		start := l.makeEntryKey(0)
+		if backward {
+			start = l.makeEntryKey(math.MaxUint64)
+		}
+
+		// prepare counter
+		counter := 0
+
+		// iterate over all keys
+		for iter.Seek(start); iter.Valid(); iter.Next() {
+			// stop if prefix does not match
+			if !bytes.HasPrefix(iter.Item().Key(), l.entryPrefix) {
+				break
+			}
+
+			// increment length
+			counter++
+
+			// check counter
+			if counter < (index + 1) {
+				continue
+			}
+
+			// otherwise parse key
+			seq, err := DecodeSequence(iter.Item().Key()[len(l.entryPrefix):])
+			if err != nil {
+				return err
+			}
+
+			// set sequence
+			sequence = seq
+
+			break
+		}
+
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	return sequence, nil
 }
 
 // Delete will remove all entries up to and including the specified sequence
