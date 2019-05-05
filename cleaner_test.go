@@ -10,7 +10,7 @@ import (
 func TestCleanerAll(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, "ledger")
+	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 10; i++ {
@@ -40,7 +40,7 @@ func TestCleanerAll(t *testing.T) {
 func TestCleanerMinRetention(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, "ledger")
+	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 10; i++ {
@@ -71,7 +71,7 @@ func TestCleanerMinRetention(t *testing.T) {
 func TestCleanerMaxRetention(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, "ledger")
+	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 20; i++ {
@@ -103,10 +103,10 @@ func TestCleanerMaxRetention(t *testing.T) {
 func TestCleanerTablePosition(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, "ledger")
+	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	table, err := CreateTable(db, "table")
+	table, err := CreateTable(db, TableOptions{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 20; i++ {

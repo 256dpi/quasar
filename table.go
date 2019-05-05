@@ -6,18 +6,26 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
-// Table manages the storage of positions in a ledger.
+// TableOptions are used to configure a table.
+type TableOptions struct {
+	// The prefix for all table keys.
+	Prefix string
+}
+
+// Table manages the storage of positions.
 type Table struct {
 	db     *DB
+	opts   TableOptions
 	prefix []byte
 }
 
 // CreateTable will create a table that stores positions in the provided db.
-func CreateTable(db *DB, prefix string) (*Table, error) {
+func CreateTable(db *DB, opts TableOptions) (*Table, error) {
 	// create table
 	t := &Table{
 		db:     db,
-		prefix: append([]byte(prefix), ':'),
+		opts:   opts,
+		prefix: append([]byte(opts.Prefix), ':'),
 	}
 
 	return t, nil

@@ -208,13 +208,13 @@ func main() {
 	}
 
 	// open ledger
-	ledger, err := quasar.CreateLedger(db, "ledger")
+	ledger, err := quasar.CreateLedger(db, LedgerOptions{Prefix: "ledger"})
 	if err != nil {
 		panic(err)
 	}
 
 	// open table
-	table, err := quasar.CreateTable(db, "table")
+	table, err := quasar.CreateTable(db, TableOptions{Prefix: "table"})
 	if err != nil {
 		panic(err)
 	}
