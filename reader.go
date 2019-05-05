@@ -43,34 +43,34 @@ func NewReader(ledger *Ledger, opts ReaderOptions) *Reader {
 }
 
 // Close will close the consumer.
-func (c *Reader) Close() {
-	c.once.Do(func() {
-		close(c.closed)
+func (r *Reader) Close() {
+	r.once.Do(func() {
+		close(r.closed)
 	})
 }
 
-func (c *Reader) worker() {
+func (r *Reader) worker() {
 	// subscribe to notifications
 	notifications := make(chan uint64, 1)
-	c.ledger.Subscribe(notifications)
-	defer c.ledger.Unsubscribe(notifications)
+	r.ledger.Subscribe(notifications)
+	defer r.ledger.Unsubscribe(notifications)
 
 	// set initial position
-	position := c.opts.Start
+	position := r.opts.Start
 
 	for {
 		// check if closed
 		select {
-		case <-c.closed:
+		case <-r.closed:
 			return
 		default:
 		}
 
 		// wait for notification if no new data in ledger
-		if c.ledger.Head() <= position {
+		if r.ledger.Head() <= position {
 			select {
 			case <-notifications:
-			case <-c.closed:
+			case <-r.closed:
 				return
 			}
 
@@ -78,10 +78,10 @@ func (c *Reader) worker() {
 		}
 
 		// read entries
-		entries, err := c.ledger.Read(position, c.opts.Batch)
+		entries, err := r.ledger.Read(position, r.opts.Batch)
 		if err != nil {
 			select {
-			case c.opts.Errors <- err:
+			case r.opts.Errors <- err:
 			default:
 			}
 
@@ -91,9 +91,9 @@ func (c *Reader) worker() {
 		// put entries on pipe
 		for _, entry := range entries {
 			select {
-			case c.opts.Entries <- entry:
+			case r.opts.Entries <- entry:
 				position = entry.Sequence + 1
-			case <-c.closed:
+			case <-r.closed:
 				return
 			}
 		}
