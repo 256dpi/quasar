@@ -124,6 +124,60 @@ func (t *Table) Count() (int, error) {
 	return count, nil
 }
 
+// Range will return the range of stored positions.
+func (t *Table) Range() (uint64, uint64, error) {
+	// prepare counter
+	var min, max uint64
+
+	// iterate over all keys
+	err := t.db.View(func(txn *badger.Txn) error {
+		// create iterator
+		iter := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer iter.Close()
+
+		// compute start
+		start := t.makeKey("")
+
+		// iterate over all keys
+		for iter.Seek(start); iter.Valid(); iter.Next() {
+			// stop if key does not match prefix
+			if !bytes.HasPrefix(iter.Item().Key(), t.prefix) {
+				break
+			}
+
+			// prepare position
+			var position uint64
+			var err error
+
+			// parse key
+			err = iter.Item().Value(func(val []byte) error {
+				position, err = DecodeSequence(val)
+				return err
+			})
+			if err != nil {
+				return err
+			}
+
+			// set min
+			if min == 0 || position < min {
+				min = position
+			}
+
+			// set max
+			if max == 0 || position > max {
+				max = position
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return min, max, nil
+}
+
 func (t *Table) makeKey(name string) []byte {
 	b := make([]byte, 0, len(t.prefix)+len(name))
 	return append(append(b, t.prefix...), []byte(name)...)

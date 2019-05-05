@@ -77,6 +77,38 @@ func TestTable(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestTableRange(t *testing.T) {
+	db := openDB(true)
+
+	table, err := CreateTable(db, "table")
+	assert.NoError(t, err)
+	assert.NotNil(t, table)
+
+	min, max, err := table.Range()
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0), min)
+	assert.Equal(t, uint64(0), max)
+
+	err = table.Set("foo", 7)
+	assert.NoError(t, err)
+
+	min, max, err = table.Range()
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(7), min)
+	assert.Equal(t, uint64(7), max)
+
+	err = table.Set("bar", 21)
+	assert.NoError(t, err)
+
+	min, max, err = table.Range()
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(7), min)
+	assert.Equal(t, uint64(21), max)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func TestTableIsolation(t *testing.T) {
 	db := openDB(true)
 
