@@ -77,8 +77,9 @@ func TestConsumer(t *testing.T) {
 	consumer.Close()
 	assert.Empty(t, errors)
 
-	n, _, _ := table.Get("foo")
-	assert.Equal(t, uint64(100), n)
+	position, err := table.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(100), position)
 
 	err = db.Close()
 	assert.NoError(t, err)

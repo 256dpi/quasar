@@ -40,10 +40,9 @@ func (t *Table) Set(name string, position uint64) error {
 }
 
 // Get will read the specified position from the table.
-func (t *Table) Get(name string) (uint64, bool, error) {
+func (t *Table) Get(name string) (uint64, error) {
 	// prepare position and found
 	var position uint64
-	var found bool
 
 	// prepare error
 	var decodeErr error
@@ -61,7 +60,6 @@ func (t *Table) Get(name string) (uint64, bool, error) {
 		// parse key
 		err = item.Value(func(val []byte) error {
 			position, decodeErr = DecodeSequence(val)
-			found = true
 			return nil
 		})
 		if err != nil {
@@ -71,12 +69,12 @@ func (t *Table) Get(name string) (uint64, bool, error) {
 		return nil
 	})
 	if err != nil {
-		return 0, false, err
+		return 0, err
 	} else if decodeErr != nil {
-		return 0, false, decodeErr
+		return 0, decodeErr
 	}
 
-	return position, found, nil
+	return position, nil
 }
 
 // Delete will remove the specified position from the table.

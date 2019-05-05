@@ -25,9 +25,8 @@ func TestTable(t *testing.T) {
 	err = table.Set("foo", 1)
 	assert.NoError(t, err)
 
-	position, ok, err := table.Get("foo")
+	position, err := table.Get("foo")
 	assert.NoError(t, err)
-	assert.True(t, ok)
 	assert.Equal(t, uint64(1), position)
 
 	count, err = table.Count()
@@ -43,9 +42,8 @@ func TestTable(t *testing.T) {
 	err = table.Delete("foo")
 	assert.NoError(t, err)
 
-	position, ok, err = table.Get("foo")
+	position, err = table.Get("foo")
 	assert.NoError(t, err)
-	assert.False(t, ok)
 	assert.Equal(t, uint64(0), position)
 
 	count, err = table.Count()
@@ -59,9 +57,8 @@ func TestTable(t *testing.T) {
 	err = table.Set("foo", 1)
 	assert.NoError(t, err)
 
-	position, ok, err = table.Get("foo")
+	position, err = table.Get("foo")
 	assert.NoError(t, err)
-	assert.True(t, ok)
 	assert.Equal(t, uint64(1), position)
 
 	count, err = table.Count()
@@ -95,9 +92,8 @@ func TestTableIsolation(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 
-	position, ok, err := table.Get("foo")
+	position, err := table.Get("foo")
 	assert.NoError(t, err)
-	assert.True(t, ok)
 	assert.Equal(t, uint64(2), position)
 }
 
@@ -120,9 +116,8 @@ func TestTableReopen(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
-	position, ok, err := table.Get("foo")
+	position, err := table.Get("foo")
 	assert.NoError(t, err)
-	assert.True(t, ok)
 	assert.Equal(t, uint64(1), position)
 
 	err = db.Close()
@@ -176,7 +171,7 @@ func BenchmarkTableGet(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		_, _, err := l.Get("foo")
+		_, err := l.Get("foo")
 		if err != nil {
 			panic(err)
 		}

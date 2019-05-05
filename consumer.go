@@ -68,7 +68,7 @@ func (c *Consumer) worker() {
 	defer c.ledger.Unsubscribe(notifications)
 
 	// fetch stored position
-	position, found, err := c.table.Get(c.opts.Name)
+	position, err := c.table.Get(c.opts.Name)
 	if err != nil {
 		select {
 		case c.opts.Errors <- err:
@@ -79,9 +79,7 @@ func (c *Consumer) worker() {
 	}
 
 	// advanced position
-	if found {
-		position++
-	}
+	position++
 
 	for {
 		// check if closed

@@ -35,8 +35,8 @@ func TestProducer(t *testing.T) {
 
 	producer.Close()
 
-	n := ledger.Length()
-	assert.Equal(t, 20, n)
+	length := ledger.Length()
+	assert.Equal(t, 20, length)
 
 	err = db.Close()
 	assert.NoError(t, err)
