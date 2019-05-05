@@ -20,11 +20,11 @@ func TestLedger(t *testing.T) {
 	ch := make(chan uint64, 10)
 	ledger.Subscribe(ch)
 
-	n := ledger.Length()
-	assert.Equal(t, 0, n)
+	length := ledger.Length()
+	assert.Equal(t, 0, length)
 
-	last := ledger.Head()
-	assert.Equal(t, uint64(0), last)
+	head := ledger.Head()
+	assert.Equal(t, uint64(0), head)
 
 	// write single
 
@@ -40,14 +40,14 @@ func TestLedger(t *testing.T) {
 		{Sequence: 1, Payload: []byte("foo")},
 	}, entries)
 
-	n = ledger.Length()
-	assert.Equal(t, 1, n)
+	length = ledger.Length()
+	assert.Equal(t, 1, length)
 
-	last = ledger.Head()
-	assert.Equal(t, uint64(1), last)
+	head = ledger.Head()
+	assert.Equal(t, uint64(1), head)
 
 	assert.Equal(t, map[string]string{
-		"ledger:00000000000000000001": "foo",
+		"ledger:#00000000000000000001": "foo",
 	}, dump(db))
 
 	// write multiple
@@ -55,7 +55,7 @@ func TestLedger(t *testing.T) {
 	err = ledger.Write(
 		Entry{Sequence: 2, Payload: []byte("bar")},
 		Entry{Sequence: 3, Payload: []byte("baz")},
-		Entry{Sequence: 4, Payload: []byte("baz")},
+		Entry{Sequence: 4, Payload: []byte("qux")},
 	)
 	assert.NoError(t, err)
 
@@ -68,20 +68,20 @@ func TestLedger(t *testing.T) {
 		{Sequence: 1, Payload: []byte("foo")},
 		{Sequence: 2, Payload: []byte("bar")},
 		{Sequence: 3, Payload: []byte("baz")},
-		{Sequence: 4, Payload: []byte("baz")},
+		{Sequence: 4, Payload: []byte("qux")},
 	}, entries)
 
-	n = ledger.Length()
-	assert.Equal(t, 4, n)
+	length = ledger.Length()
+	assert.Equal(t, 4, length)
 
-	last = ledger.Head()
-	assert.Equal(t, uint64(4), last)
+	head = ledger.Head()
+	assert.Equal(t, uint64(4), head)
 
 	assert.Equal(t, map[string]string{
-		"ledger:00000000000000000001": "foo",
-		"ledger:00000000000000000002": "bar",
-		"ledger:00000000000000000003": "baz",
-		"ledger:00000000000000000004": "baz",
+		"ledger:#00000000000000000001": "foo",
+		"ledger:#00000000000000000002": "bar",
+		"ledger:#00000000000000000003": "baz",
+		"ledger:#00000000000000000004": "qux",
 	}, dump(db))
 
 	// read partial
@@ -91,7 +91,7 @@ func TestLedger(t *testing.T) {
 	assert.Equal(t, []Entry{
 		{Sequence: 2, Payload: []byte("bar")},
 		{Sequence: 3, Payload: []byte("baz")},
-		{Sequence: 4, Payload: []byte("baz")},
+		{Sequence: 4, Payload: []byte("qux")},
 	}, entries)
 
 	// delete
@@ -102,17 +102,17 @@ func TestLedger(t *testing.T) {
 	entries, err = ledger.Read(0, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, []Entry{
-		{Sequence: 4, Payload: []byte("baz")},
+		{Sequence: 4, Payload: []byte("qux")},
 	}, entries)
 
-	n = ledger.Length()
-	assert.Equal(t, 1, n)
+	length = ledger.Length()
+	assert.Equal(t, 1, length)
 
-	last = ledger.Head()
-	assert.Equal(t, uint64(4), last)
+	head = ledger.Head()
+	assert.Equal(t, uint64(4), head)
 
 	assert.Equal(t, map[string]string{
-		"ledger:00000000000000000004": "baz",
+		"ledger:#00000000000000000004": "qux",
 	}, dump(db))
 
 	// close
@@ -121,12 +121,46 @@ func TestLedger(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestLedgerClear(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, "ledger")
+	assert.NoError(t, err)
+	assert.NotNil(t, ledger)
+
+	err = ledger.Write(
+		Entry{Sequence: 1, Payload: []byte("foo")},
+		Entry{Sequence: 2, Payload: []byte("bar")},
+		Entry{Sequence: 3, Payload: []byte("baz")},
+		Entry{Sequence: 4, Payload: []byte("qux")},
+	)
+	assert.NoError(t, err)
+
+	length := ledger.Length()
+	assert.Equal(t, 4, length)
+
+	head := ledger.Head()
+	assert.Equal(t, uint64(4), head)
+
+	err = ledger.Clear()
+	assert.NoError(t, err)
+
+	length = ledger.Length()
+	assert.Equal(t, 0, length)
+
+	head = ledger.Head()
+	assert.Equal(t, uint64(4), head)
+
+	assert.Equal(t, map[string]string{}, dump(db))
+}
+
 func TestLedgerIsolation(t *testing.T) {
 	db := openDB(true)
 
-	set(db, "00000000000000000001", "foo")
-	set(db, "ledger:00000000000000000002", "bar")
-	set(db, "z-ledger:00000000000000000003", "baz")
+	set(db, "00000000000000000001", "a")
+	set(db, "e:00000000000000000002", "b")
+	set(db, "ledger:#00000000000000000003", "c")
+	set(db, "z-ledger:#00000000000000000004", "d")
 
 	ledger, err := CreateLedger(db, "ledger")
 	assert.NoError(t, err)
@@ -135,14 +169,14 @@ func TestLedgerIsolation(t *testing.T) {
 	entries, err := ledger.Read(0, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, []Entry{
-		{Sequence: 2, Payload: []byte("bar")},
+		{Sequence: 3, Payload: []byte("c")},
 	}, entries)
 
 	length := ledger.Length()
 	assert.Equal(t, 1, length)
 
 	head := ledger.Head()
-	assert.Equal(t, uint64(2), head)
+	assert.Equal(t, uint64(3), head)
 }
 
 func TestLedgerMonotonicity(t *testing.T) {
@@ -193,11 +227,11 @@ func TestLedgerReopen(t *testing.T) {
 		{Sequence: 1, Payload: []byte("foo")},
 	}, entries)
 
-	n := ledger.Length()
-	assert.Equal(t, 1, n)
+	length := ledger.Length()
+	assert.Equal(t, 1, length)
 
-	last := ledger.Head()
-	assert.Equal(t, uint64(1), last)
+	head := ledger.Head()
+	assert.Equal(t, uint64(1), head)
 
 	err = db.Close()
 	assert.NoError(t, err)

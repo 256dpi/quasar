@@ -19,8 +19,10 @@ type Entry struct {
 
 // Ledger manages the storage of sequential entries.
 type Ledger struct {
-	db     *DB
-	prefix []byte
+	db *DB
+
+	entryPrefix []byte
+	cachePrefix []byte
 
 	receivers  sync.Map
 	writeMutex sync.Mutex
@@ -34,8 +36,9 @@ type Ledger struct {
 func CreateLedger(db *DB, prefix string) (*Ledger, error) {
 	// create ledger
 	l := &Ledger{
-		db:     db,
-		prefix: append([]byte(prefix), ':'),
+		db:          db,
+		entryPrefix: append([]byte(prefix), []byte(":#")...),
+		cachePrefix: append([]byte(prefix), []byte(":!")...),
 	}
 
 	// init ledger
@@ -64,7 +67,7 @@ func (l *Ledger) init() error {
 		// iterate over all keys
 		for iter.Seek(start); iter.Valid(); iter.Next() {
 			// stop if prefix does not match
-			if !bytes.HasPrefix(iter.Item().Key(), l.prefix) {
+			if !bytes.HasPrefix(iter.Item().Key(), l.entryPrefix) {
 				break
 			}
 
@@ -72,7 +75,7 @@ func (l *Ledger) init() error {
 			length++
 
 			// parse key and set head
-			seq, err := DecodeSequence(iter.Item().Key()[len(l.prefix):])
+			seq, err := DecodeSequence(iter.Item().Key()[len(l.entryPrefix):])
 			if err != nil {
 				return err
 			}
@@ -173,7 +176,7 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 		// iterate until enough entries have been loaded
 		for iter.Seek(start); iter.Valid() && len(list) < amount; iter.Next() {
 			// stop if prefix does not match
-			if !bytes.HasPrefix(iter.Item().Key(), l.prefix) {
+			if !bytes.HasPrefix(iter.Item().Key(), l.entryPrefix) {
 				break
 			}
 
@@ -184,7 +187,7 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 			}
 
 			// parse key
-			seq, err := DecodeSequence(iter.Item().Key()[len(l.prefix):])
+			seq, err := DecodeSequence(iter.Item().Key()[len(l.entryPrefix):])
 			if err != nil {
 				return err
 			}
@@ -224,7 +227,7 @@ func (l *Ledger) Delete(sequence uint64) error {
 		// delete all entries
 		for iter.Seek(start); iter.Valid(); iter.Next() {
 			// stop if prefix does not match
-			if !bytes.HasPrefix(iter.Item().Key(), l.prefix) {
+			if !bytes.HasPrefix(iter.Item().Key(), l.entryPrefix) {
 				break
 			}
 
@@ -278,6 +281,26 @@ func (l *Ledger) Head() uint64 {
 	return head
 }
 
+// Clear will drop all ledger entries.
+func (l *Ledger) Clear() error {
+	// acquire mutex
+	l.writeMutex.Lock()
+	defer l.writeMutex.Unlock()
+
+	// drop all entries
+	err := l.db.DropPrefix(l.entryPrefix)
+	if err != nil {
+		return err
+	}
+
+	// reset length
+	l.mutex.Lock()
+	l.length = 0
+	l.mutex.Unlock()
+
+	return nil
+}
+
 // Subscribe will subscribe the specified channel to changes to the last
 // sequence stored in the ledger. Notifications will be skipped if the specified
 // channel is not writable for some reason.
@@ -291,6 +314,6 @@ func (l *Ledger) Unsubscribe(receiver chan<- uint64) {
 }
 
 func (l *Ledger) makeKey(seq uint64) []byte {
-	b := make([]byte, 0, len(l.prefix)+SequenceLength)
-	return append(append(b, l.prefix...), EncodeSequence(seq)...)
+	b := make([]byte, 0, len(l.entryPrefix)+SequenceLength)
+	return append(append(b, l.entryPrefix...), EncodeSequence(seq)...)
 }
