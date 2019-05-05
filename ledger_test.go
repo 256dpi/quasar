@@ -165,6 +165,14 @@ func TestLedgerIndex(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(3), index)
 
+	index, err = ledger.Index(4)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0), index)
+
+	index, err = ledger.Index(-5)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0), index)
+
 	err = db.Close()
 	assert.NoError(t, err)
 }
