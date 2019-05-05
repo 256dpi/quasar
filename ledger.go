@@ -25,8 +25,9 @@ type Ledger struct {
 	entryPrefix []byte
 	cachePrefix []byte
 
-	receivers  sync.Map
-	writeMutex sync.Mutex
+	receivers   sync.Map
+	writeMutex  sync.Mutex
+	deleteMutex sync.Mutex
 
 	length int
 	head   uint64
@@ -155,7 +156,7 @@ func (l *Ledger) Write(entries ...Entry) error {
 			}
 		}
 
-		// set head
+		// cache head
 		return txn.SetEntry(&badger.Entry{
 			Key:   l.makeCacheKey("head"),
 			Value: []byte(strconv.FormatUint(head, 10)),
@@ -237,6 +238,10 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 // Delete will remove all entries up to and including the specified sequence
 // from the ledger.
 func (l *Ledger) Delete(sequence uint64) error {
+	// acquire mutex
+	l.deleteMutex.Lock()
+	defer l.deleteMutex.Unlock()
+
 	// prepare counter
 	var counter int
 
@@ -308,10 +313,13 @@ func (l *Ledger) Head() uint64 {
 }
 
 // Clear will drop all ledger entries while maintaining the head. Clear will
-// temporarily lock the underlying database and disallow parallel writes which
-// is considerably slower than just deleting entries.
+// temporarily block concurrent writes and deletes.
 func (l *Ledger) Clear() error {
-	// acquire mutex
+	// acquire delete mutex
+	l.deleteMutex.Lock()
+	defer l.deleteMutex.Unlock()
+
+	// acquire write mutex
 	l.writeMutex.Lock()
 	defer l.writeMutex.Unlock()
 
@@ -329,11 +337,14 @@ func (l *Ledger) Clear() error {
 	return nil
 }
 
-// Reset will drop all ledger entries and reset the head. Reset will temporarily
-// lock the underlying database and disallow parallel writes which is
-// considerably slower than just deleting entries.
+// Reset will drop all ledger entries and reset the head. Reset will
+// temporarily block concurrent writes and deletes.
 func (l *Ledger) Reset() error {
-	// acquire mutex
+	// acquire delete mutex
+	l.deleteMutex.Lock()
+	defer l.deleteMutex.Unlock()
+
+	// acquire write mutex
 	l.writeMutex.Lock()
 	defer l.writeMutex.Unlock()
 
