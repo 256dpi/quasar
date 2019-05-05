@@ -162,7 +162,7 @@ func printer(ledger *quasar.Ledger, done <-chan struct{}) {
 	}
 }
 
-func cleaner(ledger *quasar.Ledger, done <-chan struct{}) {
+func cleaner(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
 	for {
 		// sleep some time
 		select {
@@ -172,8 +172,14 @@ func cleaner(ledger *quasar.Ledger, done <-chan struct{}) {
 			return
 		}
 
+		// get range
+		min, _, err := table.Range()
+		if err != nil {
+			panic(err)
+		}
+
 		// delete entries
-		err := ledger.Delete(ledger.Head())
+		err = ledger.Delete(min)
 		if err != nil {
 			panic(err)
 		}
@@ -218,7 +224,7 @@ func main() {
 	wg.Add(4)
 	go producer(ledger, done)
 	go consumer(ledger, table, done)
-	go cleaner(ledger, done)
+	go cleaner(ledger, table, done)
 	go printer(ledger, done)
 
 	// prepare exit
