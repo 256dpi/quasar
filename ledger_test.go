@@ -279,6 +279,38 @@ func TestLedgerReopen(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestLedgerReopenCollapsed(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, "ledger")
+	assert.NoError(t, err)
+	assert.NotNil(t, ledger)
+
+	err = ledger.Write(Entry{Sequence: 1, Payload: []byte("foo")})
+	assert.NoError(t, err)
+
+	err = ledger.Clear()
+	assert.NoError(t, err)
+
+	err = db.Close()
+	assert.NoError(t, err)
+
+	db = openDB(false)
+
+	ledger, err = CreateLedger(db, "ledger")
+	assert.NoError(t, err)
+	assert.NotNil(t, ledger)
+
+	length := ledger.Length()
+	assert.Equal(t, 0, length)
+
+	head := ledger.Head()
+	assert.Equal(t, uint64(1), head)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func BenchmarkLedgerWrite(b *testing.B) {
 	db := openDB(true)
 
