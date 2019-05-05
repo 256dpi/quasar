@@ -14,8 +14,11 @@ var ErrNotMonotonic = errors.New("not monotonic")
 
 // Entry is a single entry in the ledger.
 type Entry struct {
+	// The entries sequence (must be greater than zero).
 	Sequence uint64
-	Payload  []byte
+
+	// The entries payload.
+	Payload []byte
 }
 
 // Ledger manages the storage of sequential entries.
