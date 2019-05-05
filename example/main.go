@@ -163,26 +163,28 @@ func printer(ledger *quasar.Ledger, done <-chan struct{}) {
 }
 
 func cleaner(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
-	for {
-		// sleep some time
-		select {
-		case <-time.After(100 * time.Millisecond):
-		case <-done:
-			wg.Done()
-			return
-		}
+	// prepare channels
+	errors := make(chan error, 1)
 
-		// get range
-		min, _, err := table.Range()
-		if err != nil {
-			panic(err)
-		}
+	// create cleaner
+	cleaner := quasar.NewCleaner(ledger, quasar.CleanerOptions{
+		MinRetention: 10000,
+		MaxRetention: 100000,
+		Tables:       []*quasar.Table{table},
+		Delay:        100 * time.Millisecond,
+		Errors:       errors,
+	})
 
-		// delete entries
-		err = ledger.Delete(min)
-		if err != nil {
-			panic(err)
-		}
+	// ensure closing
+	defer cleaner.Close()
+
+	// wait for close
+	select {
+	case err := <-errors:
+		panic(err)
+	case <-done:
+		wg.Done()
+		return
 	}
 }
 
