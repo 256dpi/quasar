@@ -3,14 +3,18 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/256dpi/quasar"
 
 	"github.com/montanaflynn/stats"
 )
+
+var wg sync.WaitGroup
 
 var send int64
 var recv int64
@@ -19,12 +23,15 @@ var mutex sync.Mutex
 
 const batch = 1000
 
-func producer(ledger *quasar.Ledger) {
+func producer(ledger *quasar.Ledger, done <-chan struct{}) {
 	// create producer
 	producer := quasar.NewProducer(ledger, quasar.ProducerOptions{
 		Batch:   batch,
 		Timeout: time.Millisecond,
 	})
+
+	// ensure closing
+	defer producer.Close()
 
 	// write entries forever
 	for {
@@ -40,11 +47,16 @@ func producer(ledger *quasar.Ledger) {
 		mutex.Unlock()
 
 		// limit rate
-		time.Sleep(5 * time.Microsecond)
+		select {
+		case <-time.After(5 * time.Microsecond):
+		case <-done:
+			wg.Done()
+			return
+		}
 	}
 }
 
-func consumer(ledger *quasar.Ledger, table *quasar.Table) {
+func consumer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
 	// prepare channels
 	entries := make(chan quasar.Entry, batch)
 	errors := make(chan error, 1)
@@ -56,6 +68,9 @@ func consumer(ledger *quasar.Ledger, table *quasar.Table) {
 		Errors:  errors,
 		Batch:   batch,
 	})
+
+	// ensure closing
+	defer consumer.Close()
 
 	// prepare counter
 	counter := 0
@@ -69,6 +84,9 @@ func consumer(ledger *quasar.Ledger, table *quasar.Table) {
 		case entry = <-entries:
 		case err := <-errors:
 			panic(err)
+		case <-done:
+			wg.Done()
+			return
 		}
 
 		// get timestamp
@@ -100,13 +118,18 @@ func consumer(ledger *quasar.Ledger, table *quasar.Table) {
 	}
 }
 
-func printer(ledger *quasar.Ledger) {
+func printer(ledger *quasar.Ledger, done <-chan struct{}) {
 	// create ticker
 	ticker := time.Tick(time.Second)
 
 	for {
 		// await signal
-		<-ticker
+		select {
+		case <-ticker:
+		case <-done:
+			wg.Done()
+			return
+		}
 
 		// get data
 		mutex.Lock()
@@ -139,16 +162,21 @@ func printer(ledger *quasar.Ledger) {
 	}
 }
 
-func cleaner(ledger *quasar.Ledger) {
+func cleaner(ledger *quasar.Ledger, done <-chan struct{}) {
 	for {
+		// sleep some time
+		select {
+		case <-time.After(100 * time.Millisecond):
+		case <-done:
+			wg.Done()
+			return
+		}
+
 		// delete entries
 		err := ledger.Delete(ledger.Head())
 		if err != nil {
 			panic(err)
 		}
-
-		// sleep some time
-		time.Sleep(100 * time.Millisecond)
 	}
 }
 
@@ -183,11 +211,28 @@ func main() {
 		panic(err)
 	}
 
-	// run reader
-	go producer(ledger)
-	go consumer(ledger, table)
-	go cleaner(ledger)
-	go printer(ledger)
+	// create control channel
+	done := make(chan struct{})
 
-	select {}
+	// run routines
+	wg.Add(4)
+	go producer(ledger, done)
+	go consumer(ledger, table, done)
+	go cleaner(ledger, done)
+	go printer(ledger, done)
+
+	// prepare exit
+	exit := make(chan os.Signal, 1)
+	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM)
+	<-exit
+
+	// close control channel
+	close(done)
+	wg.Wait()
+
+	// close db
+	err = db.Close()
+	if err != nil {
+		panic(err)
+	}
 }
