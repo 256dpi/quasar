@@ -3,6 +3,7 @@ package quasar
 import (
 	"bytes"
 	"errors"
+	"strconv"
 	"sync"
 
 	"github.com/dgraph-io/badger"
@@ -52,81 +53,41 @@ func CreateLedger(db *DB, prefix string) (*Ledger, error) {
 
 func (l *Ledger) init() error {
 	// prepare length and head
-	var length int
+	var length int64
 	var head uint64
 
-	// count all items and find head
+	// read length and head from cache
 	err := l.db.View(func(txn *badger.Txn) error {
-		// create iterator (key only)
-		iter := txn.NewIterator(badger.IteratorOptions{})
-		defer iter.Close()
+		// read length
+		item, err := txn.Get(l.makeCacheKey("length"))
+		if err != nil && err != badger.ErrKeyNotFound {
+			return err
+		}
 
-		// compute start
-		start := l.makeKey(0)
-
-		// iterate over all keys
-		for iter.Seek(start); iter.Valid(); iter.Next() {
-			// stop if prefix does not match
-			if !bytes.HasPrefix(iter.Item().Key(), l.entryPrefix) {
-				break
-			}
-
-			// increment length
-			length++
-
-			// parse key and set head
-			seq, err := DecodeSequence(iter.Item().Key()[len(l.entryPrefix):])
+		// parse setting if present
+		if item != nil {
+			// parse length
+			err = item.Value(func(val []byte) error {
+				length, err = strconv.ParseInt(string(val), 10, 64)
+				return err
+			})
 			if err != nil {
 				return err
 			}
-
-			// set head
-			head = seq
 		}
 
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	// set length and head
-	l.length = length
-	l.head = head
-
-	return nil
-}
-
-// Write will write the specified entries to the ledger. No entries have been
-// written if an error has been returned. Monotonicity of the written entries
-// is checked against the current head.
-func (l *Ledger) Write(entries ...Entry) error {
-	// acquire mutex
-	l.writeMutex.Lock()
-	defer l.writeMutex.Unlock()
-
-	// get head
-	head := l.Head()
-
-	// check and collect head
-	for _, entry := range entries {
-		// return immediately if not monotonic
-		if entry.Sequence <= head {
-			return ErrNotMonotonic
+		// read head
+		item, err = txn.Get(l.makeCacheKey("head"))
+		if err != nil && err != badger.ErrKeyNotFound {
+			return err
 		}
 
-		// set head
-		head = entry.Sequence
-	}
-
-	// begin database update
-	err := l.db.Update(func(txn *badger.Txn) error {
-		// add all entries
-		for _, entry := range entries {
-			// add entry
-			err := txn.SetEntry(&badger.Entry{
-				Key:   l.makeKey(entry.Sequence),
-				Value: entry.Payload,
+		// parse setting if present
+		if item != nil {
+			// parse length
+			err = item.Value(func(val []byte) error {
+				head, err = strconv.ParseUint(string(val), 10, 64)
+				return err
 			})
 			if err != nil {
 				return err
@@ -140,8 +101,79 @@ func (l *Ledger) Write(entries ...Entry) error {
 	}
 
 	// set length and head
+	l.length = int(length)
+	l.head = head
+
+	return nil
+}
+
+// Write will write the specified entries to the ledger. No entries have been
+// written if an error has been returned. Monotonicity of the written entries
+// is checked against the current head.
+func (l *Ledger) Write(entries ...Entry) error {
+	// acquire mutex
+	l.writeMutex.Lock()
+	defer l.writeMutex.Unlock()
+
+	// get length and head
+	length := l.length
+	head := l.Head()
+
+	// check and update head
+	for _, entry := range entries {
+		// return immediately if not monotonic
+		if entry.Sequence <= head {
+			return ErrNotMonotonic
+		}
+
+		// set head
+		head = entry.Sequence
+	}
+
+	// set length
+	length += len(entries)
+
+	// begin database update
+	err := l.db.Update(func(txn *badger.Txn) error {
+		// add all entries
+		for _, entry := range entries {
+			// add entry
+			err := txn.SetEntry(&badger.Entry{
+				Key:   l.makeEntryKey(entry.Sequence),
+				Value: entry.Payload,
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		// set length
+		err := txn.SetEntry(&badger.Entry{
+			Key:   l.makeCacheKey("length"),
+			Value: []byte(strconv.FormatInt(int64(length), 10)),
+		})
+		if err != nil {
+			return err
+		}
+
+		// set head
+		err = txn.SetEntry(&badger.Entry{
+			Key:   l.makeCacheKey("head"),
+			Value: []byte(strconv.FormatUint(head, 10)),
+		})
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// set length and head
 	l.mutex.Lock()
-	l.length += len(entries)
+	l.length = length
 	l.head = head
 	l.mutex.Unlock()
 
@@ -171,7 +203,7 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 		defer iter.Close()
 
 		// compute start
-		start := l.makeKey(sequence)
+		start := l.makeEntryKey(sequence)
 
 		// iterate until enough entries have been loaded
 		for iter.Seek(start); iter.Valid() && len(list) < amount; iter.Next() {
@@ -211,6 +243,13 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 // Delete will remove all entries up to and including the specified sequence
 // from the ledger.
 func (l *Ledger) Delete(sequence uint64) error {
+	// acquire mutex
+	l.writeMutex.Lock()
+	defer l.writeMutex.Unlock()
+
+	// get length
+	length := l.Length()
+
 	// prepare counter
 	var counter int
 
@@ -221,8 +260,8 @@ func (l *Ledger) Delete(sequence uint64) error {
 		defer iter.Close()
 
 		// compute start and needle
-		start := l.makeKey(0)
-		needle := l.makeKey(sequence)
+		start := l.makeEntryKey(0)
+		needle := l.makeEntryKey(sequence)
 
 		// delete all entries
 		for iter.Seek(start); iter.Valid(); iter.Next() {
@@ -246,6 +285,15 @@ func (l *Ledger) Delete(sequence uint64) error {
 			}
 		}
 
+		// set length
+		err := txn.SetEntry(&badger.Entry{
+			Key:   l.makeCacheKey("length"),
+			Value: []byte(strconv.FormatInt(int64(length-counter), 10)),
+		})
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -254,7 +302,7 @@ func (l *Ledger) Delete(sequence uint64) error {
 
 	// decrement length
 	l.mutex.Lock()
-	l.length -= counter
+	l.length = length - counter
 	l.mutex.Unlock()
 
 	return nil
@@ -293,6 +341,14 @@ func (l *Ledger) Clear() error {
 		return err
 	}
 
+	// set length
+	err = l.db.Update(func(txn *badger.Txn) error {
+		return txn.SetEntry(&badger.Entry{
+			Key:   l.makeCacheKey("length"),
+			Value: []byte(strconv.FormatInt(int64(0), 10)),
+		})
+	})
+
 	// reset length
 	l.mutex.Lock()
 	l.length = 0
@@ -313,7 +369,12 @@ func (l *Ledger) Unsubscribe(receiver chan<- uint64) {
 	l.receivers.Delete(receiver)
 }
 
-func (l *Ledger) makeKey(seq uint64) []byte {
+func (l *Ledger) makeEntryKey(seq uint64) []byte {
 	b := make([]byte, 0, len(l.entryPrefix)+SequenceLength)
 	return append(append(b, l.entryPrefix...), EncodeSequence(seq)...)
+}
+
+func (l *Ledger) makeCacheKey(name string) []byte {
+	b := make([]byte, 0, len(l.cachePrefix)+SequenceLength)
+	return append(append(b, l.cachePrefix...), name...)
 }

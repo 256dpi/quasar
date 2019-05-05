@@ -26,6 +26,8 @@ func TestLedger(t *testing.T) {
 	head := ledger.Head()
 	assert.Equal(t, uint64(0), head)
 
+	assert.Equal(t, map[string]string{}, dump(db))
+
 	// write single
 
 	err = ledger.Write(Entry{Sequence: 1, Payload: []byte("foo")})
@@ -47,6 +49,8 @@ func TestLedger(t *testing.T) {
 	assert.Equal(t, uint64(1), head)
 
 	assert.Equal(t, map[string]string{
+		"ledger:!head":                 "1",
+		"ledger:!length":               "1",
 		"ledger:#00000000000000000001": "foo",
 	}, dump(db))
 
@@ -78,6 +82,8 @@ func TestLedger(t *testing.T) {
 	assert.Equal(t, uint64(4), head)
 
 	assert.Equal(t, map[string]string{
+		"ledger:!head":                 "4",
+		"ledger:!length":               "4",
 		"ledger:#00000000000000000001": "foo",
 		"ledger:#00000000000000000002": "bar",
 		"ledger:#00000000000000000003": "baz",
@@ -112,6 +118,8 @@ func TestLedger(t *testing.T) {
 	assert.Equal(t, uint64(4), head)
 
 	assert.Equal(t, map[string]string{
+		"ledger:!head":                 "4",
+		"ledger:!length":               "1",
 		"ledger:#00000000000000000004": "qux",
 	}, dump(db))
 
@@ -151,7 +159,10 @@ func TestLedgerClear(t *testing.T) {
 	head = ledger.Head()
 	assert.Equal(t, uint64(4), head)
 
-	assert.Equal(t, map[string]string{}, dump(db))
+	assert.Equal(t, map[string]string{
+		"ledger:!head":   "4",
+		"ledger:!length": "0",
+	}, dump(db))
 }
 
 func TestLedgerIsolation(t *testing.T) {
@@ -159,6 +170,9 @@ func TestLedgerIsolation(t *testing.T) {
 
 	set(db, "00000000000000000001", "a")
 	set(db, "e:00000000000000000002", "b")
+	set(db, "ledger:!head", "3")
+	set(db, "ledger:!length", "1")
+	set(db, "ledger:#00000000000000000003", "c")
 	set(db, "ledger:#00000000000000000003", "c")
 	set(db, "z-ledger:#00000000000000000004", "d")
 
