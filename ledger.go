@@ -35,6 +35,8 @@ type Ledger struct {
 }
 
 // CreateLedger will create a ledger that stores entries in the provided db.
+// Read, write and delete requested can be issued concurrently to maximize
+// performance. However, only one goroutine may write entries at the same time.
 func CreateLedger(db *DB, prefix string) (*Ledger, error) {
 	// create ledger
 	l := &Ledger{
@@ -313,7 +315,9 @@ func (l *Ledger) Head() uint64 {
 }
 
 // Clear will drop all ledger entries while maintaining the head. Clear will
-// temporarily block concurrent writes and deletes.
+// temporarily block concurrent writes and deletes and lock the underlying
+// database. Other users uf the same database may receive errors due to the
+// locked database.
 func (l *Ledger) Clear() error {
 	// acquire delete mutex
 	l.deleteMutex.Lock()
@@ -337,8 +341,10 @@ func (l *Ledger) Clear() error {
 	return nil
 }
 
-// Reset will drop all ledger entries and reset the head. Reset will
-// temporarily block concurrent writes and deletes.
+// Reset will drop all ledger entries and reset the head. Reset  will
+// temporarily block concurrent writes and deletes and lock the underlying
+// database. Other users uf the same database may receive errors due to the
+// locked database.
 func (l *Ledger) Reset() error {
 	// acquire delete mutex
 	l.deleteMutex.Lock()
