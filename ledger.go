@@ -329,7 +329,7 @@ func (l *Ledger) Head() uint64 {
 	return head
 }
 
-// Clear will drop all ledger entries.
+// Clear will drop all ledger entries while maintaining the head.
 func (l *Ledger) Clear() error {
 	// acquire mutex
 	l.writeMutex.Lock()
@@ -352,6 +352,33 @@ func (l *Ledger) Clear() error {
 	// reset length
 	l.mutex.Lock()
 	l.length = 0
+	l.mutex.Unlock()
+
+	return nil
+}
+
+// Reset will drop all ledger entries and reset the head.
+func (l *Ledger) Reset() error {
+	// acquire mutex
+	l.writeMutex.Lock()
+	defer l.writeMutex.Unlock()
+
+	// drop entries
+	err := l.db.DropPrefix(l.entryPrefix)
+	if err != nil {
+		return err
+	}
+
+	// drop cache
+	err = l.db.DropPrefix(l.cachePrefix)
+	if err != nil {
+		return err
+	}
+
+	// reset length
+	l.mutex.Lock()
+	l.length = 0
+	l.head = 0
 	l.mutex.Unlock()
 
 	return nil

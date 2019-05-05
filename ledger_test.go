@@ -165,6 +165,39 @@ func TestLedgerClear(t *testing.T) {
 	}, dump(db))
 }
 
+func TestLedgerReset(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, "ledger")
+	assert.NoError(t, err)
+	assert.NotNil(t, ledger)
+
+	err = ledger.Write(
+		Entry{Sequence: 1, Payload: []byte("foo")},
+		Entry{Sequence: 2, Payload: []byte("bar")},
+		Entry{Sequence: 3, Payload: []byte("baz")},
+		Entry{Sequence: 4, Payload: []byte("qux")},
+	)
+	assert.NoError(t, err)
+
+	length := ledger.Length()
+	assert.Equal(t, 4, length)
+
+	head := ledger.Head()
+	assert.Equal(t, uint64(4), head)
+
+	err = ledger.Reset()
+	assert.NoError(t, err)
+
+	length = ledger.Length()
+	assert.Equal(t, 0, length)
+
+	head = ledger.Head()
+	assert.Equal(t, uint64(0), head)
+
+	assert.Equal(t, map[string]string{}, dump(db))
+}
+
 func TestLedgerIsolation(t *testing.T) {
 	db := openDB(true)
 
