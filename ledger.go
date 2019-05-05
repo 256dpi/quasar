@@ -56,41 +56,53 @@ func (l *Ledger) init() error {
 	var length int64
 	var head uint64
 
-	// read length and head from cache
+	// read length and head from entries and cache
 	err := l.db.View(func(txn *badger.Txn) error {
-		// read length
-		item, err := txn.Get(l.makeCacheKey("length"))
-		if err != nil && err != badger.ErrKeyNotFound {
-			return err
-		}
+		// create iterator (key only)
+		iter := txn.NewIterator(badger.IteratorOptions{})
+		defer iter.Close()
 
-		// parse setting if present
-		if item != nil {
-			// parse length
-			err = item.Value(func(val []byte) error {
-				length, err = strconv.ParseInt(string(val), 10, 64)
-				return err
-			})
+		// compute start
+		start := l.makeEntryKey(0)
+
+		// iterate over all keys
+		for iter.Seek(start); iter.Valid(); iter.Next() {
+			// stop if prefix does not match
+			if !bytes.HasPrefix(iter.Item().Key(), l.entryPrefix) {
+				break
+			}
+
+			// increment length
+			length++
+
+			// parse key and set head
+			seq, err := DecodeSequence(iter.Item().Key()[len(l.entryPrefix):])
 			if err != nil {
 				return err
 			}
+
+			// set head
+			head = seq
 		}
 
-		// read head
-		item, err = txn.Get(l.makeCacheKey("head"))
-		if err != nil && err != badger.ErrKeyNotFound {
-			return err
-		}
+		// read cached head if collapsed
+		if length <= 0 {
+			// read cached head
+			item, err := txn.Get(l.makeCacheKey("head"))
+			if err != nil && err != badger.ErrKeyNotFound {
+				return err
+			}
 
-		// parse setting if present
-		if item != nil {
-			// parse length
-			err = item.Value(func(val []byte) error {
-				head, err = strconv.ParseUint(string(val), 10, 64)
-				return err
-			})
-			if err != nil {
-				return err
+			// parse if present
+			if item != nil {
+				// parse length
+				err = item.Value(func(val []byte) error {
+					head, err = strconv.ParseUint(string(val), 10, 64)
+					return err
+				})
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -115,8 +127,7 @@ func (l *Ledger) Write(entries ...Entry) error {
 	l.writeMutex.Lock()
 	defer l.writeMutex.Unlock()
 
-	// get length and head
-	length := l.length
+	// get head
 	head := l.Head()
 
 	// check and update head
@@ -129,9 +140,6 @@ func (l *Ledger) Write(entries ...Entry) error {
 		// set head
 		head = entry.Sequence
 	}
-
-	// set length
-	length += len(entries)
 
 	// begin database update
 	err := l.db.Update(func(txn *badger.Txn) error {
@@ -147,25 +155,11 @@ func (l *Ledger) Write(entries ...Entry) error {
 			}
 		}
 
-		// set length
-		err := txn.SetEntry(&badger.Entry{
-			Key:   l.makeCacheKey("length"),
-			Value: []byte(strconv.FormatInt(int64(length), 10)),
-		})
-		if err != nil {
-			return err
-		}
-
 		// set head
-		err = txn.SetEntry(&badger.Entry{
+		return txn.SetEntry(&badger.Entry{
 			Key:   l.makeCacheKey("head"),
 			Value: []byte(strconv.FormatUint(head, 10)),
 		})
-		if err != nil {
-			return err
-		}
-
-		return nil
 	})
 	if err != nil {
 		return err
@@ -173,7 +167,7 @@ func (l *Ledger) Write(entries ...Entry) error {
 
 	// set length and head
 	l.mutex.Lock()
-	l.length = length
+	l.length += len(entries)
 	l.head = head
 	l.mutex.Unlock()
 
@@ -243,13 +237,6 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 // Delete will remove all entries up to and including the specified sequence
 // from the ledger.
 func (l *Ledger) Delete(sequence uint64) error {
-	// acquire mutex
-	l.writeMutex.Lock()
-	defer l.writeMutex.Unlock()
-
-	// get length
-	length := l.Length()
-
 	// prepare counter
 	var counter int
 
@@ -285,15 +272,6 @@ func (l *Ledger) Delete(sequence uint64) error {
 			}
 		}
 
-		// set length
-		err := txn.SetEntry(&badger.Entry{
-			Key:   l.makeCacheKey("length"),
-			Value: []byte(strconv.FormatInt(int64(length-counter), 10)),
-		})
-		if err != nil {
-			return err
-		}
-
 		return nil
 	})
 	if err != nil {
@@ -302,7 +280,7 @@ func (l *Ledger) Delete(sequence uint64) error {
 
 	// decrement length
 	l.mutex.Lock()
-	l.length = length - counter
+	l.length -= counter
 	l.mutex.Unlock()
 
 	return nil
@@ -329,7 +307,9 @@ func (l *Ledger) Head() uint64 {
 	return head
 }
 
-// Clear will drop all ledger entries while maintaining the head.
+// Clear will drop all ledger entries while maintaining the head. Clear will
+// temporarily lock the underlying database and disallow parallel writes which
+// is considerably slower than just deleting entries.
 func (l *Ledger) Clear() error {
 	// acquire mutex
 	l.writeMutex.Lock()
@@ -341,14 +321,6 @@ func (l *Ledger) Clear() error {
 		return err
 	}
 
-	// set length
-	err = l.db.Update(func(txn *badger.Txn) error {
-		return txn.SetEntry(&badger.Entry{
-			Key:   l.makeCacheKey("length"),
-			Value: []byte(strconv.FormatInt(int64(0), 10)),
-		})
-	})
-
 	// reset length
 	l.mutex.Lock()
 	l.length = 0
@@ -357,7 +329,9 @@ func (l *Ledger) Clear() error {
 	return nil
 }
 
-// Reset will drop all ledger entries and reset the head.
+// Reset will drop all ledger entries and reset the head. Reset will temporarily
+// lock the underlying database and disallow parallel writes which is
+// considerably slower than just deleting entries.
 func (l *Ledger) Reset() error {
 	// acquire mutex
 	l.writeMutex.Lock()
