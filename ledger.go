@@ -324,18 +324,53 @@ func (l *Ledger) Delete(sequence uint64) error {
 	l.deleteMutex.Lock()
 	defer l.deleteMutex.Unlock()
 
+	// compute start and needle
+	start := l.makeEntryKey(0)
+	needle := l.makeEntryKey(sequence)
+
 	// prepare counter
 	var counter int
+
+	// delete in multiple attempts to honor max batch count
+	for {
+		// perform partial delete
+		end, n, err := l.partialDelete(start, needle)
+		if err != nil {
+			return err
+		}
+
+		// increment counter
+		counter += n
+
+		// check if end has been reached
+		if end == nil {
+			break
+		}
+
+		// set new start
+		start = end
+	}
+
+	// decrement length
+	l.mutex.Lock()
+	l.length -= counter
+	l.mutex.Unlock()
+
+	return nil
+}
+
+func (l *Ledger) partialDelete(start, needle []byte) ([]byte, int, error) {
+	// prepare counter
+	var counter int
+
+	// prepare end
+	var end []byte
 
 	// begin database update
 	err := l.db.Update(func(txn *badger.Txn) error {
 		// create iterator
 		iter := txn.NewIterator(badger.IteratorOptions{})
 		defer iter.Close()
-
-		// compute start and needle
-		start := l.makeEntryKey(0)
-		needle := l.makeEntryKey(sequence)
 
 		// delete all entries
 		for iter.Seek(start); iter.Valid(); iter.Next() {
@@ -357,20 +392,21 @@ func (l *Ledger) Delete(sequence uint64) error {
 			if bytes.Equal(needle, iter.Item().Key()) {
 				break
 			}
+
+			// stop if exhausted
+			if counter >= int(l.db.MaxBatchCount()-10) {
+				end = iter.Item().KeyCopy(nil)
+				break
+			}
 		}
 
 		return nil
 	})
 	if err != nil {
-		return err
+		return nil, 0, err
 	}
 
-	// decrement length
-	l.mutex.Lock()
-	l.length -= counter
-	l.mutex.Unlock()
-
-	return nil
+	return end, counter, nil
 }
 
 // Length will return the number of stored entries.

@@ -374,6 +374,37 @@ func TestLedgerReopenCollapsed(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestLedgerHugeDelete(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	assert.NoError(t, err)
+	assert.NotNil(t, ledger)
+
+	batch := make([]Entry, 0, db.MaxBatchCount()+10)
+	for i := int64(1); i <= (db.MaxBatchCount() + 10); i++ {
+		batch = append(batch, Entry{
+			Sequence: uint64(i),
+			Payload:  []byte("foo"),
+		})
+	}
+
+	err = ledger.Write(batch[0 : db.MaxBatchCount()-10]...)
+	assert.NoError(t, err)
+
+	err = ledger.Write(batch[db.MaxBatchCount()-10 : db.MaxBatchCount()+10]...)
+	assert.NoError(t, err)
+
+	err = ledger.Delete(uint64(db.MaxBatchCount() + 10))
+	assert.NoError(t, err)
+
+	length := ledger.length
+	assert.Equal(t, 0, length)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func BenchmarkLedgerWrite(b *testing.B) {
 	db := openDB(true)
 
