@@ -74,7 +74,9 @@ func (l *Ledger) init() error {
 	// read length and head from entries and cache
 	err := l.db.View(func(txn *badger.Txn) error {
 		// create iterator (key only)
-		iter := txn.NewIterator(badger.IteratorOptions{})
+		iter := txn.NewIterator(badger.IteratorOptions{
+			Prefix: l.entryPrefix,
+		})
 		defer iter.Close()
 
 		// compute start
@@ -82,11 +84,6 @@ func (l *Ledger) init() error {
 
 		// iterate over all keys
 		for iter.Seek(start); iter.Valid(); iter.Next() {
-			// stop if prefix does not match
-			if !bytes.HasPrefix(iter.Item().Key(), l.entryPrefix) {
-				break
-			}
-
 			// increment length
 			length++
 
@@ -207,8 +204,12 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 
 	// read entries
 	err := l.db.View(func(txn *badger.Txn) error {
+		// prepare options
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = l.entryPrefix
+
 		// create iterator
-		iter := txn.NewIterator(badger.DefaultIteratorOptions)
+		iter := txn.NewIterator(opts)
 		defer iter.Close()
 
 		// compute start
@@ -216,11 +217,6 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 
 		// iterate until enough entries have been loaded
 		for iter.Seek(start); iter.Valid() && len(list) < amount; iter.Next() {
-			// stop if prefix does not match
-			if !bytes.HasPrefix(iter.Item().Key(), l.entryPrefix) {
-				break
-			}
-
 			// copy values
 			pld, err := iter.Item().ValueCopy(nil)
 			if err != nil {
@@ -269,6 +265,7 @@ func (l *Ledger) Index(index int) (uint64, error) {
 		// create iterator (key only)
 		iter := txn.NewIterator(badger.IteratorOptions{
 			Reverse: backward,
+			Prefix: l.entryPrefix,
 		})
 		defer iter.Close()
 
@@ -283,11 +280,6 @@ func (l *Ledger) Index(index int) (uint64, error) {
 
 		// iterate over all keys
 		for iter.Seek(start); iter.Valid(); iter.Next() {
-			// stop if prefix does not match
-			if !bytes.HasPrefix(iter.Item().Key(), l.entryPrefix) {
-				break
-			}
-
 			// increment length
 			counter++
 
@@ -368,17 +360,16 @@ func (l *Ledger) partialDelete(start, needle []byte) ([]byte, int, error) {
 
 	// begin database update
 	err := l.db.Update(func(txn *badger.Txn) error {
+		// prepare options
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = l.entryPrefix
+
 		// create iterator
 		iter := txn.NewIterator(badger.IteratorOptions{})
 		defer iter.Close()
 
 		// delete all entries
 		for iter.Seek(start); iter.Valid(); iter.Next() {
-			// stop if prefix does not match
-			if !bytes.HasPrefix(iter.Item().Key(), l.entryPrefix) {
-				break
-			}
-
 			// delete entry
 			err := txn.Delete(iter.Item().KeyCopy(nil))
 			if err != nil {

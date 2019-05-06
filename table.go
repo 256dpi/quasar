@@ -1,8 +1,6 @@
 package quasar
 
 import (
-	"bytes"
-
 	"github.com/dgraph-io/badger"
 )
 
@@ -106,7 +104,9 @@ func (t *Table) Count() (int, error) {
 	// iterate over all keys
 	err := t.db.View(func(txn *badger.Txn) error {
 		// create iterator (key only)
-		iter := txn.NewIterator(badger.IteratorOptions{})
+		iter := txn.NewIterator(badger.IteratorOptions{
+			Prefix: t.prefix,
+		})
 		defer iter.Close()
 
 		// compute start
@@ -114,11 +114,6 @@ func (t *Table) Count() (int, error) {
 
 		// iterate over all keys
 		for iter.Seek(start); iter.Valid(); iter.Next() {
-			// stop if key does not match prefix
-			if !bytes.HasPrefix(iter.Item().Key(), t.prefix) {
-				break
-			}
-
 			// increment counter
 			count++
 		}
@@ -139,6 +134,10 @@ func (t *Table) Range() (uint64, uint64, error) {
 
 	// iterate over all keys
 	err := t.db.View(func(txn *badger.Txn) error {
+		// prepare options
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = t.prefix
+
 		// create iterator
 		iter := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer iter.Close()
@@ -148,11 +147,6 @@ func (t *Table) Range() (uint64, uint64, error) {
 
 		// iterate over all keys
 		for iter.Seek(start); iter.Valid(); iter.Next() {
-			// stop if key does not match prefix
-			if !bytes.HasPrefix(iter.Item().Key(), t.prefix) {
-				break
-			}
-
 			// prepare position
 			var position uint64
 			var err error
