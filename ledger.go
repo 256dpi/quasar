@@ -265,7 +265,7 @@ func (l *Ledger) Index(index int) (uint64, error) {
 		// create iterator (key only)
 		iter := txn.NewIterator(badger.IteratorOptions{
 			Reverse: backward,
-			Prefix: l.entryPrefix,
+			Prefix:  l.entryPrefix,
 		})
 		defer iter.Close()
 

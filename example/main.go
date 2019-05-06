@@ -202,7 +202,7 @@ func main() {
 	}
 
 	// open db
-	db, err := quasar.OpenDB(dir)
+	db, err := quasar.OpenDB(dir, quasar.DBOptions{GCInterval: 10 * time.Second})
 	if err != nil {
 		panic(err)
 	}
