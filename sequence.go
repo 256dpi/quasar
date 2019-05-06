@@ -1,6 +1,7 @@
 package quasar
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"sync"
@@ -68,4 +69,52 @@ func EncodeSequence(s uint64, compact bool) []byte {
 // DecodeSequence will decode a sequence.
 func DecodeSequence(key []byte) (uint64, error) {
 	return strconv.ParseUint(string(key), 10, 64)
+}
+
+// EncodeSequences will encode a list of sequences.
+func EncodeSequences(list []uint64) []byte {
+	// check length
+	if len(list) == 0 {
+		return nil
+	}
+
+	// prepare buffer
+	buf := make([]byte, 0, len(list)*(SequenceLength+1))
+
+	// add sequences
+	for _, item := range list {
+		buf = strconv.AppendUint(buf, item, 10)
+		buf = append(buf, ',')
+	}
+
+	return buf[:len(buf)-1]
+}
+
+// DecodeSequences will decode a list of sequences.
+func DecodeSequences(value []byte) ([]uint64, error) {
+	// prepare list
+	list := make([]uint64, 0, bytes.Count(value, []byte(",")))
+
+	// parse all items
+	for i := 0; i < len(value); {
+		// get index of next separator
+		index := bytes.Index(value[i:], []byte(","))
+		if index <= 0 {
+			index = len(value) - i
+		}
+
+		// parse item
+		item, err := strconv.ParseUint(string(value[i:i+index]), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		// add item
+		list = append(list, item)
+
+		// advance counter
+		i += index + 1
+	}
+
+	return list, nil
 }

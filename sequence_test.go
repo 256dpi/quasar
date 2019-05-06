@@ -40,7 +40,7 @@ func TestSequenceProperties(t *testing.T) {
 	assert.Equal(t, uint32(math.MaxUint32), n)
 }
 
-func TestEncodeAndDecodeKey(t *testing.T) {
+func TestEncodeAndDecodeSequence(t *testing.T) {
 	key := EncodeSequence(0, true)
 	assert.Equal(t, []byte("0"), key)
 
@@ -67,6 +67,29 @@ func TestEncodeAndDecodeKey(t *testing.T) {
 	n, err = DecodeSequence(key)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(math.MaxUint64), n)
+}
+
+func TestEncodeDecodeSequences(t *testing.T) {
+	value := EncodeSequences([]uint64{1, 2, 3})
+	assert.Equal(t, []byte("1,2,3"), value)
+
+	list, err := DecodeSequences(value)
+	assert.NoError(t, err)
+	assert.Equal(t, []uint64{1, 2, 3}, list)
+
+	value = EncodeSequences([]uint64{7})
+	assert.Equal(t, []byte("7"), value)
+
+	list, err = DecodeSequences(value)
+	assert.NoError(t, err)
+	assert.Equal(t, []uint64{7}, list)
+
+	value = EncodeSequences([]uint64{})
+	assert.Equal(t, []byte(nil), value)
+
+	list, err = DecodeSequences(value)
+	assert.NoError(t, err)
+	assert.Equal(t, []uint64{}, list)
 }
 
 func BenchmarkGenerateSequence(b *testing.B) {
