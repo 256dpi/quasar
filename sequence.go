@@ -56,7 +56,12 @@ func SplitSequence(s uint64) (time.Time, uint32) {
 }
 
 // EncodeSequence will encode a sequence.
-func EncodeSequence(s uint64) []byte {
+func EncodeSequence(s uint64, compact bool) []byte {
+	// check compact
+	if compact {
+		return []byte(fmt.Sprintf("%d", s))
+	}
+
 	return []byte(fmt.Sprintf("%020d", s))
 }
 

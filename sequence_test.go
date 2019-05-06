@@ -41,21 +41,27 @@ func TestSequenceProperties(t *testing.T) {
 }
 
 func TestEncodeAndDecodeKey(t *testing.T) {
-	key := EncodeSequence(0)
+	key := EncodeSequence(0, true)
+	assert.Equal(t, []byte("0"), key)
+
+	key = EncodeSequence(0, false)
 	assert.Equal(t, []byte("00000000000000000000"), key)
 
 	n, err := DecodeSequence(key)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(0), n)
 
-	key = EncodeSequence(1)
+	key = EncodeSequence(1, true)
+	assert.Equal(t, []byte("1"), key)
+
+	key = EncodeSequence(1, false)
 	assert.Equal(t, []byte("00000000000000000001"), key)
 
 	n, err = DecodeSequence(key)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(1), n)
 
-	key = EncodeSequence(math.MaxUint64)
+	key = EncodeSequence(math.MaxUint64, false)
 	assert.Equal(t, []byte("18446744073709551615"), key)
 
 	n, err = DecodeSequence(key)
@@ -75,14 +81,14 @@ func BenchmarkEncodeSequence(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		EncodeSequence(uint64(i))
+		EncodeSequence(uint64(i), false)
 	}
 }
 
 func BenchmarkDecodeSequence(b *testing.B) {
 	m := map[int][]byte{}
 	for i := 0; i < b.N; i++ {
-		m[i] = EncodeSequence(uint64(i))
+		m[i] = EncodeSequence(uint64(i), false)
 	}
 
 	b.ResetTimer()

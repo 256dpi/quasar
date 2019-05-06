@@ -34,7 +34,7 @@ func TestTable(t *testing.T) {
 	assert.Equal(t, 1, count)
 
 	assert.Equal(t, map[string]string{
-		"table:foo": "00000000000000000001",
+		"table:foo": "1",
 	}, dump(db))
 
 	// delete

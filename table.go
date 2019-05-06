@@ -35,7 +35,7 @@ func (t *Table) Set(name string, position uint64) error {
 	err := t.db.Update(func(txn *badger.Txn) error {
 		return txn.SetEntry(&badger.Entry{
 			Key:   t.makeKey(name),
-			Value: EncodeSequence(position),
+			Value: EncodeSequence(position, true),
 		})
 	})
 	if err != nil {
