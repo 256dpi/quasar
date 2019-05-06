@@ -4,23 +4,23 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
-// TableOptions are used to configure a table.
-type TableOptions struct {
-	// The prefix for all table keys.
+// MatrixOptions are used to configure a matrix.
+type MatrixOptions struct {
+	// The prefix for all matrix keys.
 	Prefix string
 }
 
-// Table manages the storage of positions.
-type Table struct {
+// Matrix manages the storage of positions markers.
+type Matrix struct {
 	db     *DB
-	opts   TableOptions
+	opts   MatrixOptions
 	prefix []byte
 }
 
-// CreateTable will create a table that stores positions in the provided db.
-func CreateTable(db *DB, opts TableOptions) (*Table, error) {
-	// create table
-	t := &Table{
+// CreateMatrix will create a matrix that stores positions in the provided db.
+func CreateMatrix(db *DB, opts MatrixOptions) (*Matrix, error) {
+	// create matrix
+	t := &Matrix{
 		db:     db,
 		opts:   opts,
 		prefix: append([]byte(opts.Prefix), ':'),
@@ -29,13 +29,13 @@ func CreateTable(db *DB, opts TableOptions) (*Table, error) {
 	return t, nil
 }
 
-// Set will write the specified position to the table.
-func (t *Table) Set(name string, position uint64) error {
+// Set will write the specified sequences to the matrix.
+func (t *Matrix) Set(name string, sequences []uint64) error {
 	// set entry
 	err := t.db.Update(func(txn *badger.Txn) error {
 		return txn.SetEntry(&badger.Entry{
 			Key:   t.makeKey(name),
-			Value: EncodeSequence(position, true),
+			Value: EncodeSequences(sequences),
 		})
 	})
 	if err != nil {
@@ -45,10 +45,10 @@ func (t *Table) Set(name string, position uint64) error {
 	return nil
 }
 
-// Get will read the specified position from the table.
-func (t *Table) Get(name string) (uint64, error) {
-	// prepare position
-	var position uint64
+// Get will read the specified sequences from the matrix.
+func (t *Matrix) Get(name string) ([]uint64, error) {
+	// prepare sequences
+	var sequences []uint64
 
 	// read entries
 	err := t.db.View(func(txn *badger.Txn) error {
@@ -62,7 +62,7 @@ func (t *Table) Get(name string) (uint64, error) {
 
 		// parse key
 		err = item.Value(func(val []byte) error {
-			position, err = DecodeSequence(val)
+			sequences, err = DecodeSequences(val)
 			return err
 		})
 		if err != nil {
@@ -72,14 +72,14 @@ func (t *Table) Get(name string) (uint64, error) {
 		return nil
 	})
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return position, nil
+	return sequences, nil
 }
 
-// Delete will remove the specified position from the table.
-func (t *Table) Delete(name string) error {
+// Delete will remove the specified sequences from the matrix.
+func (t *Matrix) Delete(name string) error {
 	// delete item
 	err := t.db.Update(func(txn *badger.Txn) error {
 		return txn.Delete(t.makeKey(name))
@@ -91,8 +91,8 @@ func (t *Table) Delete(name string) error {
 	return nil
 }
 
-// Count will return the number of stored positions.
-func (t *Table) Count() (int, error) {
+// Count will return the number of stored sequences.
+func (t *Matrix) Count() (int, error) {
 	// prepare counter
 	var counter int
 
@@ -122,8 +122,8 @@ func (t *Table) Count() (int, error) {
 }
 
 // Range will return the range of stored positions.
-func (t *Table) Range() (uint64, uint64, error) {
-	// prepare min and max
+func (t *Matrix) Range() (uint64, uint64, error) {
+	// prepare counter
 	var min, max uint64
 
 	// iterate over all keys
@@ -142,24 +142,29 @@ func (t *Table) Range() (uint64, uint64, error) {
 		// iterate over all keys
 		for iter.Seek(start); iter.Valid(); iter.Next() {
 			// parse key
-			var position uint64
+			var sequences []uint64
 			var err error
 			err = iter.Item().Value(func(val []byte) error {
-				position, err = DecodeSequence(val)
+				sequences, err = DecodeSequences(val)
 				return err
 			})
 			if err != nil {
 				return err
 			}
 
+			// continue if empty
+			if len(sequences) == 0 {
+				continue
+			}
+
 			// set min
-			if min == 0 || position < min {
-				min = position
+			if min == 0 || sequences[0] < min {
+				min = sequences[0]
 			}
 
 			// set max
-			if max == 0 || position > max {
-				max = position
+			if max == 0 || sequences[len(sequences)-1] > max {
+				max = sequences[len(sequences)-1]
 			}
 		}
 
@@ -172,7 +177,7 @@ func (t *Table) Range() (uint64, uint64, error) {
 	return min, max, nil
 }
 
-func (t *Table) makeKey(name string) []byte {
+func (t *Matrix) makeKey(name string) []byte {
 	b := make([]byte, 0, len(t.prefix)+len(name))
 	return append(append(b, t.prefix...), []byte(name)...)
 }
