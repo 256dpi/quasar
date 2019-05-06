@@ -26,9 +26,9 @@ func TestReader(t *testing.T) {
 
 	opts := ReaderOptions{
 		Start:   0,
+		Batch:   10,
 		Entries: entries,
 		Errors:  errors,
-		Batch:   10,
 	}
 
 	reader := NewReader(ledger, opts)

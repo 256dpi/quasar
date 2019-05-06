@@ -7,14 +7,14 @@ type ConsumerOptions struct {
 	// The name of the consumer.
 	Name string
 
+	// The amount of entries to fetch from the ledger at once.
+	Batch int
+
 	// The channel on which entries are sent.
 	Entries chan<- Entry
 
 	// The channel on which errors are sent.
 	Errors chan<- error
-
-	// The amount of entries to fetch from the ledger at once.
-	Batch int
 }
 
 // Consumer manages consuming messages of a ledger using a persistent position.

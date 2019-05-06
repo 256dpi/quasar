@@ -29,9 +29,9 @@ func TestConsumer(t *testing.T) {
 
 	opts := ConsumerOptions{
 		Name:    "foo",
+		Batch:   10,
 		Entries: entries,
 		Errors:  errors,
-		Batch:   10,
 	}
 
 	consumer := NewConsumer(ledger, table, opts)

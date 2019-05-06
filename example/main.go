@@ -64,9 +64,9 @@ func consumer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) 
 	// create reader
 	consumer := quasar.NewConsumer(ledger, table, quasar.ConsumerOptions{
 		Name:    "example",
+		Batch:   batch,
 		Entries: entries,
 		Errors:  errors,
-		Batch:   batch,
 	})
 
 	// ensure closing

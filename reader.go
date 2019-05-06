@@ -7,14 +7,14 @@ type ReaderOptions struct {
 	// The start position of the reader.
 	Start uint64
 
+	// The amount of entries to fetch from the ledger at once.
+	Batch int
+
 	// The channel on which entries are sent.
 	Entries chan<- Entry
 
 	// The channel on which errors are sent.
 	Errors chan<- error
-
-	// The amount of entries to fetch from the ledger at once.
-	Batch int
 }
 
 // Reader manages consuming messages of a ledger.
