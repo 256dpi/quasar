@@ -1,6 +1,8 @@
 package quasar
 
-import "sync"
+import (
+	"gopkg.in/tomb.v2"
+)
 
 // ReaderOptions are used to configure a reader.
 type ReaderOptions struct {
@@ -21,35 +23,30 @@ type ReaderOptions struct {
 type Reader struct {
 	ledger *Ledger
 	opts   ReaderOptions
-
-	once   sync.Once
-	closed chan struct{}
+	tomb   tomb.Tomb
 }
 
 // NewReader will create and return a new reader.
 func NewReader(ledger *Ledger, opts ReaderOptions) *Reader {
-	// prepare consumers
-	c := &Reader{
+	// prepare reader
+	r := &Reader{
 		ledger: ledger,
 		opts:   opts,
-
-		closed: make(chan struct{}),
 	}
 
 	// run worker
-	go c.worker()
+	r.tomb.Go(r.worker)
 
-	return c
+	return r
 }
 
 // Close will close the consumer.
 func (r *Reader) Close() {
-	r.once.Do(func() {
-		close(r.closed)
-	})
+	r.tomb.Kill(nil)
+	_ = r.tomb.Wait()
 }
 
-func (r *Reader) worker() {
+func (r *Reader) worker() error {
 	// subscribe to notifications
 	notifications := make(chan uint64, 1)
 	r.ledger.Subscribe(notifications)
@@ -61,8 +58,8 @@ func (r *Reader) worker() {
 	for {
 		// check if closed
 		select {
-		case <-r.closed:
-			return
+		case <-r.tomb.Dying():
+			return tomb.ErrDying
 		default:
 		}
 
@@ -70,8 +67,8 @@ func (r *Reader) worker() {
 		if r.ledger.Head() <= position {
 			select {
 			case <-notifications:
-			case <-r.closed:
-				return
+			case <-r.tomb.Dying():
+				return tomb.ErrDying
 			}
 
 			continue
@@ -85,7 +82,7 @@ func (r *Reader) worker() {
 			default:
 			}
 
-			return
+			return err
 		}
 
 		// put entries on pipe
@@ -93,8 +90,8 @@ func (r *Reader) worker() {
 			select {
 			case r.opts.Entries <- entry:
 				position = entry.Sequence + 1
-			case <-r.closed:
-				return
+			case <-r.tomb.Dying():
+				return tomb.ErrDying
 			}
 		}
 	}

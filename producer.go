@@ -3,6 +3,8 @@ package quasar
 import (
 	"sync"
 	"time"
+
+	"gopkg.in/tomb.v2"
 )
 
 var noop = func(error) {}
@@ -27,9 +29,9 @@ type Producer struct {
 	ledger *Ledger
 	opts   ProducerOptions
 	pipe   chan tuple
-	once   sync.Once
-	closed chan struct{}
 	mutex  sync.RWMutex
+	once   sync.Once
+	tomb   tomb.Tomb
 }
 
 // NewProducer will create and return a producer.
@@ -39,11 +41,10 @@ func NewProducer(ledger *Ledger, opts ProducerOptions) *Producer {
 		ledger: ledger,
 		opts:   opts,
 		pipe:   make(chan tuple, opts.Batch),
-		closed: make(chan struct{}),
 	}
 
 	// run publisher
-	go p.publisher()
+	p.tomb.Go(p.publisher)
 
 	return p
 }
@@ -54,7 +55,7 @@ func NewProducer(ledger *Ledger, opts ProducerOptions) *Producer {
 func (p *Producer) Write(entry Entry, ack func(error)) bool {
 	// check if closed
 	select {
-	case <-p.closed:
+	case <-p.tomb.Dying():
 		return false
 	default:
 	}
@@ -78,25 +79,28 @@ func (p *Producer) Write(entry Entry, ack func(error)) bool {
 	select {
 	case p.pipe <- tpl:
 		return true
-	case <-p.closed:
+	case <-p.tomb.Dying():
 		return false
 	}
 }
 
 // Close will close the producer.
 func (p *Producer) Close() {
-	p.once.Do(func() {
-		// close closed
-		close(p.closed)
+	// kill tomb
+	p.tomb.Kill(nil)
 
-		// close pipe
+	// close pipe
+	p.once.Do(func() {
 		p.mutex.Lock()
 		close(p.pipe)
 		p.mutex.Unlock()
 	})
+
+	// wait for exit
+	_ = p.tomb.Wait()
 }
 
-func (p *Producer) publisher() {
+func (p *Producer) publisher() error {
 	for {
 		// prepare entries and acks
 		entries := make([]Entry, 0, p.opts.Batch)
@@ -107,7 +111,7 @@ func (p *Producer) publisher() {
 		case tpl, ok := <-p.pipe:
 			// return if pipe has been closed
 			if !ok {
-				return
+				return tomb.ErrDying
 			}
 
 			// add entry and ack

@@ -1,8 +1,9 @@
 package quasar
 
 import (
-	"sync"
 	"time"
+
+	"gopkg.in/tomb.v2"
 )
 
 // CleanerOptions are used to configure a cleaner.
@@ -28,8 +29,7 @@ type Cleaner struct {
 	ledger *Ledger
 	opts   CleanerOptions
 
-	once   sync.Once
-	closed chan struct{}
+	tomb tomb.Tomb
 }
 
 // NewCleaner will create and return a new cleaner.
@@ -38,30 +38,27 @@ func NewCleaner(ledger *Ledger, opts CleanerOptions) *Cleaner {
 	c := &Cleaner{
 		ledger: ledger,
 		opts:   opts,
-
-		closed: make(chan struct{}),
 	}
 
 	// run worker
-	go c.worker()
+	c.tomb.Go(c.worker)
 
 	return c
 }
 
 // Close will close the cleaner.
 func (c *Cleaner) Close() {
-	c.once.Do(func() {
-		close(c.closed)
-	})
+	c.tomb.Kill(nil)
+	_ = c.tomb.Wait()
 }
 
-func (c *Cleaner) worker() {
+func (c *Cleaner) worker() error {
 	for {
 		// wait for trigger or close
 		select {
 		case <-time.After(c.opts.Delay):
-		case <-c.closed:
-			return
+		case <-c.tomb.Dying():
+			return tomb.ErrDying
 		}
 
 		// skip if ledger is too small
@@ -82,7 +79,7 @@ func (c *Cleaner) worker() {
 				default:
 				}
 
-				return
+				return err
 			}
 
 			// set to minimal position if valid
@@ -101,7 +98,7 @@ func (c *Cleaner) worker() {
 				default:
 				}
 
-				return
+				return err
 			}
 
 			// set to lowest position if valid
@@ -120,7 +117,7 @@ func (c *Cleaner) worker() {
 				default:
 				}
 
-				return
+				return err
 			}
 
 			// set to highest position if valid
@@ -137,7 +134,7 @@ func (c *Cleaner) worker() {
 			default:
 			}
 
-			return
+			return err
 		}
 	}
 }

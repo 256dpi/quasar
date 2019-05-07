@@ -1,6 +1,8 @@
 package quasar
 
-import "sync"
+import (
+	"gopkg.in/tomb.v2"
+)
 
 // ConsumerOptions are used to configure a consumer.
 type ConsumerOptions struct {
@@ -22,23 +24,20 @@ type Consumer struct {
 	ledger *Ledger
 	table  *Table
 	opts   ConsumerOptions
-	once   sync.Once
-	closed chan struct{}
+	tomb   tomb.Tomb
 }
 
 // NewConsumer will create and return a new consumer.
 func NewConsumer(ledger *Ledger, table *Table, opts ConsumerOptions) *Consumer {
-	// prepare consumers
+	// prepare consumer
 	c := &Consumer{
 		ledger: ledger,
 		table:  table,
 		opts:   opts,
-
-		closed: make(chan struct{}),
 	}
 
 	// run worker
-	go c.worker()
+	c.tomb.Go(c.worker)
 
 	return c
 }
@@ -56,12 +55,11 @@ func (c *Consumer) Ack(position uint64) error {
 
 // Close will close the consumer.
 func (c *Consumer) Close() {
-	c.once.Do(func() {
-		close(c.closed)
-	})
+	c.tomb.Kill(nil)
+	_ = c.tomb.Wait()
 }
 
-func (c *Consumer) worker() {
+func (c *Consumer) worker() error {
 	// subscribe to notifications
 	notifications := make(chan uint64, 1)
 	c.ledger.Subscribe(notifications)
@@ -75,7 +73,7 @@ func (c *Consumer) worker() {
 		default:
 		}
 
-		return
+		return err
 	}
 
 	// advanced position
@@ -84,8 +82,8 @@ func (c *Consumer) worker() {
 	for {
 		// check if closed
 		select {
-		case <-c.closed:
-			return
+		case <-c.tomb.Dying():
+			return tomb.ErrDying
 		default:
 		}
 
@@ -93,8 +91,8 @@ func (c *Consumer) worker() {
 		if c.ledger.Head() <= position {
 			select {
 			case <-notifications:
-			case <-c.closed:
-				return
+			case <-c.tomb.Dying():
+				return tomb.ErrDying
 			}
 
 			continue
@@ -108,7 +106,7 @@ func (c *Consumer) worker() {
 			default:
 			}
 
-			return
+			return err
 		}
 
 		// put entries on pipe
@@ -116,8 +114,8 @@ func (c *Consumer) worker() {
 			select {
 			case c.opts.Entries <- entry:
 				position = entry.Sequence + 1
-			case <-c.closed:
-				return
+			case <-c.tomb.Dying():
+				return tomb.ErrDying
 			}
 		}
 	}

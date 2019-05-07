@@ -2,7 +2,8 @@ package quasar
 
 import (
 	"sort"
-	"sync"
+
+	"gopkg.in/tomb.v2"
 )
 
 // WorkerOptions are used to configure a worker.
@@ -29,8 +30,7 @@ type Worker struct {
 	matrix *Matrix
 	opts   WorkerOptions
 	marks  chan uint64
-	once   sync.Once
-	closed chan struct{}
+	tomb   tomb.Tomb
 }
 
 // NewWorker will create and return a new worker.
@@ -41,11 +41,10 @@ func NewWorker(ledger *Ledger, matrix *Matrix, opts WorkerOptions) *Worker {
 		matrix: matrix,
 		opts:   opts,
 		marks:  make(chan uint64, opts.Window),
-		closed: make(chan struct{}),
 	}
 
 	// run worker
-	go c.worker()
+	c.tomb.Go(c.worker)
 
 	return c
 }
@@ -54,18 +53,17 @@ func NewWorker(ledger *Ledger, matrix *Matrix, opts WorkerOptions) *Worker {
 func (w *Worker) Ack(sequence uint64) {
 	select {
 	case w.marks <- sequence:
-	case <-w.closed:
+	case <-w.tomb.Dying():
 	}
 }
 
 // Close will close the worker.
 func (w *Worker) Close() {
-	w.once.Do(func() {
-		close(w.closed)
-	})
+	w.tomb.Kill(nil)
+	_ = w.tomb.Wait()
 }
 
-func (w *Worker) worker() {
+func (w *Worker) worker() error {
 	// subscribe to notifications
 	notifications := make(chan uint64, 1)
 	w.ledger.Subscribe(notifications)
@@ -79,7 +77,7 @@ func (w *Worker) worker() {
 		default:
 		}
 
-		return
+		return err
 	}
 
 	// prepare markers
@@ -111,7 +109,7 @@ func (w *Worker) worker() {
 				default:
 				}
 
-				return
+				return err
 			}
 
 			// add unprocessed entries
@@ -136,8 +134,8 @@ func (w *Worker) worker() {
 	for {
 		// check if closed
 		select {
-		case <-w.closed:
-			return
+		case <-w.tomb.Dying():
+			return tomb.ErrDying
 		default:
 		}
 
@@ -151,7 +149,7 @@ func (w *Worker) worker() {
 				default:
 				}
 
-				return
+				return err
 			}
 
 			// add entries
@@ -227,11 +225,11 @@ func (w *Worker) worker() {
 				default:
 				}
 
-				return
+				return err
 			}
 		case <-dynNotifications:
-		case <-w.closed:
-			return
+		case <-w.tomb.Dying():
+			return tomb.ErrDying
 		}
 	}
 }
