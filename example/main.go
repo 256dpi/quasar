@@ -24,6 +24,8 @@ var mutex sync.Mutex
 const batch = 1000
 
 func producer(ledger *quasar.Ledger, done <-chan struct{}) {
+	defer wg.Done()
+
 	// create producer
 	producer := quasar.NewProducer(ledger, quasar.ProducerOptions{
 		Batch:   batch,
@@ -56,13 +58,14 @@ func producer(ledger *quasar.Ledger, done <-chan struct{}) {
 		select {
 		case <-time.After(5 * time.Microsecond):
 		case <-done:
-			wg.Done()
 			return
 		}
 	}
 }
 
 func consumer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
+	defer wg.Done()
+
 	// prepare channels
 	entries := make(chan quasar.Entry, batch)
 	errors := make(chan error, 1)
@@ -91,7 +94,6 @@ func consumer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) 
 		case err := <-errors:
 			panic(err)
 		case <-done:
-			wg.Done()
 			return
 		}
 
@@ -125,6 +127,8 @@ func consumer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) 
 }
 
 func printer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
+	defer wg.Done()
+
 	// create ticker
 	ticker := time.Tick(time.Second)
 
@@ -133,7 +137,6 @@ func printer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
 		select {
 		case <-ticker:
 		case <-done:
-			wg.Done()
 			return
 		}
 
@@ -176,6 +179,8 @@ func printer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
 }
 
 func cleaner(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
+	defer wg.Done()
+
 	// prepare channels
 	errors := make(chan error, 1)
 
@@ -196,7 +201,6 @@ func cleaner(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
 	case err := <-errors:
 		panic(err)
 	case <-done:
-		wg.Done()
 		return
 	}
 }
