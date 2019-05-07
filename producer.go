@@ -41,8 +41,8 @@ func NewProducer(ledger *Ledger, opts ProducerOptions) *Producer {
 		pipe:   make(chan tuple, opts.Batch),
 	}
 
-	// run publisher
-	p.tomb.Go(p.publisher)
+	// run worker
+	p.tomb.Go(p.worker)
 
 	return p
 }
@@ -93,7 +93,7 @@ func (p *Producer) Close() {
 	_ = p.tomb.Wait()
 }
 
-func (p *Producer) publisher() error {
+func (p *Producer) worker() error {
 	for {
 		// prepare entries and acks
 		entries := make([]Entry, 0, p.opts.Batch)
