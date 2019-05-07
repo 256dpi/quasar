@@ -20,6 +20,9 @@ type CleanerOptions struct {
 	// The tables to check for minimal positions.
 	Tables []*Table
 
+	// The matrices to check for minimal positions.
+	Matrices []*Matrix
+
 	// The channel on which errors are sent.
 	Errors chan<- error
 }
@@ -92,6 +95,25 @@ func (c *Cleaner) worker() error {
 		for _, table := range c.opts.Tables {
 			// get lowest position
 			lowestPosition, _, err := table.Range()
+			if err != nil {
+				select {
+				case c.opts.Errors <- err:
+				default:
+				}
+
+				return err
+			}
+
+			// set to lowest position if valid
+			if lowestPosition > 0 && deletePosition > lowestPosition {
+				deletePosition = lowestPosition
+			}
+		}
+
+		// honor lowest matrix positions
+		for _, matrix := range c.opts.Matrices {
+			// get lowest position
+			lowestPosition, _, err := matrix.Range()
 			if err != nil {
 				select {
 				case c.opts.Errors <- err:
