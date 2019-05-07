@@ -160,14 +160,6 @@ func (w *Worker) worker() error {
 			}
 		}
 
-		// prepare dynamic notifications
-		var dynNotifications <-chan uint64
-
-		// enable notifications only if there is space
-		if len(markers) < w.opts.Window-w.opts.Batch {
-			dynNotifications = notifications
-		}
-
 		// prepare dynamic queue and entry
 		var dynQueue chan<- Entry
 		var dynEntry Entry
@@ -227,7 +219,7 @@ func (w *Worker) worker() error {
 
 				return err
 			}
-		case <-dynNotifications:
+		case <-notifications:
 		case <-w.tomb.Dying():
 			return tomb.ErrDying
 		}
