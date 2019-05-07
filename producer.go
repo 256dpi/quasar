@@ -7,8 +7,6 @@ import (
 	"gopkg.in/tomb.v2"
 )
 
-var noop = func(error) {}
-
 type tuple struct {
 	entry Entry
 	ack   func(error)
@@ -58,11 +56,6 @@ func (p *Producer) Write(entry Entry, ack func(error)) bool {
 	case <-p.tomb.Dying():
 		return false
 	default:
-	}
-
-	// set noop ack if missing
-	if ack == nil {
-		ack = noop
 	}
 
 	// create tuple
@@ -151,7 +144,9 @@ func (p *Producer) publisher() error {
 
 		// call acks
 		for _, ack := range acks {
-			ack(err)
+			if ack != nil {
+				ack(err)
+			}
 		}
 	}
 }
