@@ -17,6 +17,9 @@ type WorkerOptions struct {
 	// The maximal size of the unprocessed sequence range.
 	Window int
 
+	// The number of acks to skip before a new one is written.
+	Skip int
+
 	// The channel on which entries are sent.
 	Entries chan<- Entry
 
@@ -131,6 +134,9 @@ func (w *Worker) worker() error {
 		}
 	}
 
+	// prepare skipped
+	var skipped int
+
 	for {
 		// check if closed
 		select {
@@ -207,6 +213,20 @@ func (w *Worker) worker() error {
 				// remove first positive
 				delete(markers, list[0])
 				list = list[1:]
+			}
+
+			// handle skipping
+			if w.opts.Skip > 0 {
+				// increment counter
+				skipped++
+
+				// return immediately when skipped
+				if skipped <= w.opts.Skip {
+					break
+				}
+
+				// otherwise reset counter
+				skipped = 0
 			}
 
 			// store sequences in matrix

@@ -223,3 +223,68 @@ func TestWorkerOnDemand(t *testing.T) {
 	err = db.Close()
 	assert.NoError(t, err)
 }
+
+func TestWorkerSkipping(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	assert.NoError(t, err)
+
+	matrix, err := CreateMatrix(db, MatrixOptions{Prefix: "matrix"})
+	assert.NoError(t, err)
+
+	for i := 1; i <= 100; i++ {
+		err = ledger.Write(Entry{
+			Sequence: uint64(i),
+			Payload:  []byte("foo"),
+		})
+		assert.NoError(t, err)
+	}
+
+	entries := make(chan Entry, 1)
+	errors := make(chan error, 1)
+
+	opts := WorkerOptions{
+		Name:    "foo",
+		Batch:   5,
+		Window:  10,
+		Skip:    2,
+		Entries: entries,
+		Errors:  errors,
+	}
+
+	worker := NewWorker(ledger, matrix, opts)
+
+	entry := <-entries
+	worker.Ack(entry.Sequence)
+
+	time.Sleep(10 * time.Millisecond)
+
+	sequences, err := matrix.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, []uint64(nil), sequences)
+
+	entry = <-entries
+	worker.Ack(entry.Sequence)
+
+	time.Sleep(10 * time.Millisecond)
+
+	sequences, err = matrix.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, []uint64(nil), sequences)
+
+	entry = <-entries
+	worker.Ack(entry.Sequence)
+
+	time.Sleep(10 * time.Millisecond)
+
+	sequences, err = matrix.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, []uint64{3}, sequences)
+
+	worker.Close()
+	assert.Empty(t, errors)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
