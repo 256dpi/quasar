@@ -74,15 +74,13 @@ func consumer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) 
 	consumer := quasar.NewConsumer(ledger, table, quasar.ConsumerOptions{
 		Name:    "example",
 		Batch:   batch,
+		Skip:    batch,
 		Entries: entries,
 		Errors:  errors,
 	})
 
 	// ensure closing
 	defer consumer.Close()
-
-	// prepare counter
-	counter := 0
 
 	for {
 		// prepare entry
@@ -109,19 +107,10 @@ func consumer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) 
 		diffs = append(diffs, diff)
 		mutex.Unlock()
 
-		// increment counter
-		counter++
-
-		// check counter
-		if counter > batch {
-			// acknowledge
-			err := consumer.Ack(entry.Sequence)
-			if err != nil {
-				panic(err)
-			}
-
-			// reset counter
-			counter = 0
+		// acknowledge
+		err := consumer.Ack(entry.Sequence)
+		if err != nil {
+			panic(err)
 		}
 	}
 }

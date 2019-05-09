@@ -146,3 +146,67 @@ func TestConsumerOnDemand(t *testing.T) {
 	err = db.Close()
 	assert.NoError(t, err)
 }
+
+func TestConsumerSkipping(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	assert.NoError(t, err)
+
+	table, err := CreateTable(db, TableOptions{Prefix: "table"})
+	assert.NoError(t, err)
+
+	for i := 1; i <= 100; i++ {
+		err = ledger.Write(Entry{
+			Sequence: uint64(i),
+			Payload:  []byte("foo"),
+		})
+		assert.NoError(t, err)
+	}
+
+	entries := make(chan Entry, 1)
+	errors := make(chan error, 1)
+
+	opts := ConsumerOptions{
+		Name:    "foo",
+		Batch:   10,
+		Skip:    2,
+		Entries: entries,
+		Errors:  errors,
+	}
+
+	consumer := NewConsumer(ledger, table, opts)
+
+	entry := <-entries
+
+	err = consumer.Ack(entry.Sequence)
+	assert.NoError(t, err)
+
+	position, err := table.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0), position)
+
+	entry = <-entries
+
+	err = consumer.Ack(entry.Sequence)
+	assert.NoError(t, err)
+
+	position, err = table.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0), position)
+
+	entry = <-entries
+
+	err = consumer.Ack(entry.Sequence)
+	assert.NoError(t, err)
+
+	position, err = table.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(3), position)
+
+	consumer.Close()
+	assert.Empty(t, errors)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}

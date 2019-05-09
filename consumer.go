@@ -14,6 +14,9 @@ type ConsumerOptions struct {
 	// The amount of entries to fetch from the ledger at once.
 	Batch int
 
+	// The number of acks to skip before a new one is written.
+	Skip int
+
 	// The channel on which entries are sent.
 	Entries chan<- Entry
 
@@ -27,8 +30,9 @@ type Consumer struct {
 	table  *Table
 	opts   ConsumerOptions
 
-	head  uint64
-	mutex sync.Mutex
+	head    uint64
+	skipped int
+	mutex   sync.Mutex
 
 	tomb tomb.Tomb
 }
@@ -51,14 +55,30 @@ func NewConsumer(ledger *Ledger, table *Table, opts ConsumerOptions) *Consumer {
 // Ack will acknowledge the consumption of message up to the specified position.
 // Positions that are lower than previously acknowledged positions are ignored.
 func (c *Consumer) Ack(position uint64) error {
-	// get current head
+	// acquire mutex
 	c.mutex.Lock()
-	head := c.head
-	c.mutex.Unlock()
+	defer c.mutex.Unlock()
 
 	// return immediately if lower or equal
-	if position <= head {
+	if position <= c.head {
 		return nil
+	}
+
+	// set new head
+	c.head = position
+
+	// handle skipping
+	if c.opts.Skip > 0 {
+		// increment counter
+		c.skipped++
+
+		// return immediately when skipped
+		if c.skipped <= c.opts.Skip {
+			return nil
+		}
+
+		// otherwise reset counter
+		c.skipped = 0
 	}
 
 	// save position in table
@@ -66,13 +86,6 @@ func (c *Consumer) Ack(position uint64) error {
 	if err != nil {
 		return err
 	}
-
-	// write new head
-	c.mutex.Lock()
-	if c.head < position {
-		c.head = position
-	}
-	c.mutex.Unlock()
 
 	return nil
 }
