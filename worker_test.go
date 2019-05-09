@@ -11,10 +11,10 @@ import (
 func TestWorker(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	matrix, err := CreateMatrix(db, MatrixOptions{Prefix: "matrix"})
+	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -29,15 +29,13 @@ func TestWorker(t *testing.T) {
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	opts := WorkerOptions{
+	worker := NewWorker(ledger, matrix, WorkerConfig{
 		Name:    "foo",
 		Batch:   5,
 		Window:  10,
 		Entries: entries,
 		Errors:  errors,
-	}
-
-	worker := NewWorker(ledger, matrix, opts)
+	})
 
 	for {
 		counter++
@@ -59,9 +57,14 @@ func TestWorker(t *testing.T) {
 	assert.Empty(t, errors)
 
 	entries = make(chan Entry, 10)
-	opts.Entries = entries
 
-	worker = NewWorker(ledger, matrix, opts)
+	worker = NewWorker(ledger, matrix, WorkerConfig{
+		Name:    "foo",
+		Batch:   5,
+		Window:  10,
+		Entries: entries,
+		Errors:  errors,
+	})
 
 	for {
 		counter++
@@ -93,10 +96,10 @@ func TestWorker(t *testing.T) {
 func TestWorkerRandom(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	matrix, err := CreateMatrix(db, MatrixOptions{Prefix: "matrix"})
+	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -111,15 +114,13 @@ func TestWorkerRandom(t *testing.T) {
 	errors := make(chan error, 1)
 	signal := make(chan struct{}, 100)
 
-	opts := WorkerOptions{
+	worker := NewWorker(ledger, matrix, WorkerConfig{
 		Name:    "foo",
 		Batch:   5,
 		Window:  10,
 		Entries: entries,
 		Errors:  errors,
-	}
-
-	worker := NewWorker(ledger, matrix, opts)
+	})
 
 	for i := 0; i < 5; i++ {
 		go func() {
@@ -164,24 +165,22 @@ func TestWorkerRandom(t *testing.T) {
 func TestWorkerOnDemand(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	matrix, err := CreateMatrix(db, MatrixOptions{Prefix: "matrix"})
+	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
 	assert.NoError(t, err)
 
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	opts := WorkerOptions{
+	worker := NewWorker(ledger, matrix, WorkerConfig{
 		Name:    "foo",
 		Batch:   5,
 		Window:  10,
 		Entries: entries,
 		Errors:  errors,
-	}
-
-	worker := NewWorker(ledger, matrix, opts)
+	})
 
 	go func() {
 		for i := 1; i <= 100; i++ {
@@ -227,10 +226,10 @@ func TestWorkerOnDemand(t *testing.T) {
 func TestWorkerSkipping(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	matrix, err := CreateMatrix(db, MatrixOptions{Prefix: "matrix"})
+	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -244,16 +243,14 @@ func TestWorkerSkipping(t *testing.T) {
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	opts := WorkerOptions{
+	worker := NewWorker(ledger, matrix, WorkerConfig{
 		Name:    "foo",
 		Batch:   5,
 		Window:  10,
 		Skip:    2,
 		Entries: entries,
 		Errors:  errors,
-	}
-
-	worker := NewWorker(ledger, matrix, opts)
+	})
 
 	entry := <-entries
 	worker.Ack(entry.Sequence)

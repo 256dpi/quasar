@@ -9,7 +9,7 @@ import (
 func TestReader(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -24,14 +24,14 @@ func TestReader(t *testing.T) {
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	opts := ReaderOptions{
+	reader := NewReader(ledger, ReaderConfig{
 		Start:   0,
 		Batch:   10,
 		Entries: entries,
 		Errors:  errors,
-	}
+	})
 
-	reader := NewReader(ledger, opts)
+	var next uint64
 
 	for {
 		counter++
@@ -40,8 +40,9 @@ func TestReader(t *testing.T) {
 		assert.Equal(t, uint64(counter), entry.Sequence)
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
+		next = entry.Sequence + 1
+
 		if counter == 50 {
-			opts.Start = entry.Sequence + 1
 			break
 		}
 	}
@@ -50,9 +51,13 @@ func TestReader(t *testing.T) {
 	assert.Empty(t, errors)
 
 	entries = make(chan Entry, 10)
-	opts.Entries = entries
 
-	reader = NewReader(ledger, opts)
+	reader = NewReader(ledger, ReaderConfig{
+		Start:   next,
+		Batch:   10,
+		Entries: entries,
+		Errors:  errors,
+	})
 
 	for {
 		counter++

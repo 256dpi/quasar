@@ -4,8 +4,8 @@ import (
 	"gopkg.in/tomb.v2"
 )
 
-// ReaderOptions are used to configure a reader.
-type ReaderOptions struct {
+// ReaderConfig are used to configure a reader.
+type ReaderConfig struct {
 	// The start position of the reader.
 	Start uint64
 
@@ -22,16 +22,16 @@ type ReaderOptions struct {
 // Reader manages consuming messages of a ledger.
 type Reader struct {
 	ledger *Ledger
-	opts   ReaderOptions
+	config ReaderConfig
 	tomb   tomb.Tomb
 }
 
 // NewReader will create and return a new reader.
-func NewReader(ledger *Ledger, opts ReaderOptions) *Reader {
+func NewReader(ledger *Ledger, config ReaderConfig) *Reader {
 	// prepare reader
 	r := &Reader{
 		ledger: ledger,
-		opts:   opts,
+		config: config,
 	}
 
 	// run worker
@@ -53,7 +53,7 @@ func (r *Reader) worker() error {
 	defer r.ledger.Unsubscribe(notifications)
 
 	// set initial position
-	position := r.opts.Start
+	position := r.config.Start
 
 	for {
 		// check if closed
@@ -75,10 +75,10 @@ func (r *Reader) worker() error {
 		}
 
 		// read entries
-		entries, err := r.ledger.Read(position, r.opts.Batch)
+		entries, err := r.ledger.Read(position, r.config.Batch)
 		if err != nil {
 			select {
-			case r.opts.Errors <- err:
+			case r.config.Errors <- err:
 			default:
 			}
 
@@ -88,7 +88,7 @@ func (r *Reader) worker() error {
 		// put entries on pipe
 		for _, entry := range entries {
 			select {
-			case r.opts.Entries <- entry:
+			case r.config.Entries <- entry:
 				position = entry.Sequence + 1
 			case <-r.tomb.Dying():
 				return tomb.ErrDying

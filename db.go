@@ -10,8 +10,8 @@ import (
 // DB is a generic database.
 type DB = badger.DB
 
-// DBOptions are used to configure a DB.
-type DBOptions struct {
+// DBConfig are used to configure a DB.
+type DBConfig struct {
 	// The interval of the garbage collector.
 	GCInterval time.Duration
 
@@ -20,7 +20,7 @@ type DBOptions struct {
 }
 
 // OpenDB will open or create the specified db.
-func OpenDB(dir string, opts DBOptions) (*DB, error) {
+func OpenDB(dir string, config DBConfig) (*DB, error) {
 	// ensure directory
 	err := os.MkdirAll(dir, 0777)
 	if err != nil {
@@ -40,11 +40,11 @@ func OpenDB(dir string, opts DBOptions) (*DB, error) {
 	}
 
 	// run gc routine if requested
-	if opts.GCInterval > 0 {
+	if config.GCInterval > 0 {
 		go func() {
 			for {
 				// sleep some time
-				time.Sleep(opts.GCInterval)
+				time.Sleep(config.GCInterval)
 
 				// run gc
 				err = db.RunValueLogGC(0.5)
@@ -52,7 +52,7 @@ func OpenDB(dir string, opts DBOptions) (*DB, error) {
 					return
 				} else if err != nil && err != badger.ErrNoRewrite {
 					select {
-					case opts.Errors <- err:
+					case config.Errors <- err:
 					default:
 					}
 				}

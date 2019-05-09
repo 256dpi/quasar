@@ -12,7 +12,7 @@ func TestTable(t *testing.T) {
 
 	// open
 
-	table, err := CreateTable(db, TableOptions{Prefix: "table"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
@@ -80,7 +80,7 @@ func TestTable(t *testing.T) {
 func TestTableMonotonicity(t *testing.T) {
 	db := openDB(true)
 
-	table, err := CreateTable(db, TableOptions{Prefix: "table"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
@@ -121,7 +121,7 @@ func TestTableMonotonicity(t *testing.T) {
 func TestTableRange(t *testing.T) {
 	db := openDB(true)
 
-	table, err := CreateTable(db, TableOptions{Prefix: "table"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
@@ -157,7 +157,7 @@ func TestTableIsolation(t *testing.T) {
 	set(db, "table:foo", "00000000000000000002")
 	set(db, "z-table:foo", "00000000000000000003")
 
-	table, err := CreateTable(db, TableOptions{Prefix: "table"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
@@ -173,7 +173,7 @@ func TestTableIsolation(t *testing.T) {
 func TestTableReopen(t *testing.T) {
 	db := openDB(true)
 
-	table, err := CreateTable(db, TableOptions{Prefix: "table"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
@@ -185,7 +185,7 @@ func TestTableReopen(t *testing.T) {
 
 	db = openDB(false)
 
-	table, err = CreateTable(db, TableOptions{Prefix: "table"})
+	table, err = CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
@@ -200,7 +200,7 @@ func TestTableReopen(t *testing.T) {
 func BenchmarkTableSet(b *testing.B) {
 	db := openDB(true)
 
-	table, err := CreateTable(db, TableOptions{Prefix: "table"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	if err != nil {
 		panic(err)
 	}
@@ -228,7 +228,7 @@ func BenchmarkTableSet(b *testing.B) {
 func BenchmarkTableGet(b *testing.B) {
 	db := openDB(true)
 
-	l, err := CreateTable(db, TableOptions{Prefix: "table"})
+	l, err := CreateTable(db, TableConfig{Prefix: "table"})
 	if err != nil {
 		panic(err)
 	}
@@ -261,7 +261,7 @@ func BenchmarkTableGet(b *testing.B) {
 func BenchmarkTableDelete(b *testing.B) {
 	db := openDB(true)
 
-	l, err := CreateTable(db, TableOptions{Prefix: "table"})
+	l, err := CreateTable(db, TableConfig{Prefix: "table"})
 	if err != nil {
 		panic(err)
 	}

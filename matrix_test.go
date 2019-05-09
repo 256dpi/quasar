@@ -12,7 +12,7 @@ func TestMatrix(t *testing.T) {
 
 	// open
 
-	matrix, err := CreateMatrix(db, MatrixOptions{Prefix: "matrix"})
+	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
 	assert.NoError(t, err)
 	assert.NotNil(t, matrix)
 
@@ -80,7 +80,7 @@ func TestMatrix(t *testing.T) {
 func TestMatrixRange(t *testing.T) {
 	db := openDB(true)
 
-	matrix, err := CreateMatrix(db, MatrixOptions{Prefix: "matrix"})
+	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
 	assert.NoError(t, err)
 	assert.NotNil(t, matrix)
 
@@ -116,7 +116,7 @@ func TestMatrixIsolation(t *testing.T) {
 	set(db, "matrix:foo", "2")
 	set(db, "z-matrix:foo", "3")
 
-	matrix, err := CreateMatrix(db, MatrixOptions{Prefix: "matrix"})
+	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
 	assert.NoError(t, err)
 	assert.NotNil(t, matrix)
 
@@ -132,7 +132,7 @@ func TestMatrixIsolation(t *testing.T) {
 func TestMatrixReopen(t *testing.T) {
 	db := openDB(true)
 
-	matrix, err := CreateMatrix(db, MatrixOptions{Prefix: "matrix"})
+	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
 	assert.NoError(t, err)
 	assert.NotNil(t, matrix)
 
@@ -144,7 +144,7 @@ func TestMatrixReopen(t *testing.T) {
 
 	db = openDB(false)
 
-	matrix, err = CreateMatrix(db, MatrixOptions{Prefix: "matrix"})
+	matrix, err = CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
 	assert.NoError(t, err)
 	assert.NotNil(t, matrix)
 
@@ -159,7 +159,7 @@ func TestMatrixReopen(t *testing.T) {
 func BenchmarkMatrixSet(b *testing.B) {
 	db := openDB(true)
 
-	matrix, err := CreateMatrix(db, MatrixOptions{Prefix: "matrix"})
+	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
 	if err != nil {
 		panic(err)
 	}
@@ -187,7 +187,7 @@ func BenchmarkMatrixSet(b *testing.B) {
 func BenchmarkMatrixGet(b *testing.B) {
 	db := openDB(true)
 
-	l, err := CreateMatrix(db, MatrixOptions{Prefix: "matrix"})
+	l, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
 	if err != nil {
 		panic(err)
 	}
@@ -220,7 +220,7 @@ func BenchmarkMatrixGet(b *testing.B) {
 func BenchmarkMatrixDelete(b *testing.B) {
 	db := openDB(true)
 
-	l, err := CreateMatrix(db, MatrixOptions{Prefix: "matrix"})
+	l, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
 	if err != nil {
 		panic(err)
 	}

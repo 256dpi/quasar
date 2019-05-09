@@ -6,8 +6,8 @@ import (
 	"gopkg.in/tomb.v2"
 )
 
-// WorkerOptions are used to configure a worker.
-type WorkerOptions struct {
+// WorkerConfig are used to configure a worker.
+type WorkerConfig struct {
 	// The name of the worker.
 	Name string
 
@@ -31,19 +31,19 @@ type WorkerOptions struct {
 type Worker struct {
 	ledger *Ledger
 	matrix *Matrix
-	opts   WorkerOptions
+	config WorkerConfig
 	marks  chan uint64
 	tomb   tomb.Tomb
 }
 
 // NewWorker will create and return a new worker.
-func NewWorker(ledger *Ledger, matrix *Matrix, opts WorkerOptions) *Worker {
+func NewWorker(ledger *Ledger, matrix *Matrix, config WorkerConfig) *Worker {
 	// prepare workers
 	c := &Worker{
 		ledger: ledger,
 		matrix: matrix,
-		opts:   opts,
-		marks:  make(chan uint64, opts.Window),
+		config: config,
+		marks:  make(chan uint64, config.Window),
 	}
 
 	// run worker
@@ -73,10 +73,10 @@ func (w *Worker) worker() error {
 	defer w.ledger.Unsubscribe(notifications)
 
 	// fetch stored sequences
-	sequences, err := w.matrix.Get(w.opts.Name)
+	sequences, err := w.matrix.Get(w.config.Name)
 	if err != nil {
 		select {
-		case w.opts.Errors <- err:
+		case w.config.Errors <- err:
 		default:
 		}
 
@@ -105,10 +105,10 @@ func (w *Worker) worker() error {
 		// load all unprocessed entries
 		for {
 			// load a batch of unprocessed entries
-			entries, err := w.ledger.Read(head, w.opts.Batch)
+			entries, err := w.ledger.Read(head, w.config.Batch)
 			if err != nil {
 				select {
-				case w.opts.Errors <- err:
+				case w.config.Errors <- err:
 				default:
 				}
 
@@ -146,12 +146,12 @@ func (w *Worker) worker() error {
 		}
 
 		// check if there is space for another batch
-		if len(markers) < w.opts.Window-w.opts.Batch {
+		if len(markers) < w.config.Window-w.config.Batch {
 			// load more entries
-			entries, err := w.ledger.Read(head+1, w.opts.Batch)
+			entries, err := w.ledger.Read(head+1, w.config.Batch)
 			if err != nil {
 				select {
-				case w.opts.Errors <- err:
+				case w.config.Errors <- err:
 				default:
 				}
 
@@ -172,7 +172,7 @@ func (w *Worker) worker() error {
 
 		// only queue an entry if one is available
 		if len(queue) > 0 {
-			dynQueue = w.opts.Entries
+			dynQueue = w.config.Entries
 			dynEntry = queue[0]
 		}
 
@@ -216,12 +216,12 @@ func (w *Worker) worker() error {
 			}
 
 			// handle skipping
-			if w.opts.Skip > 0 {
+			if w.config.Skip > 0 {
 				// increment counter
 				skipped++
 
 				// return immediately when skipped
-				if skipped <= w.opts.Skip {
+				if skipped <= w.config.Skip {
 					break
 				}
 
@@ -230,10 +230,10 @@ func (w *Worker) worker() error {
 			}
 
 			// store sequences in matrix
-			err := w.matrix.Set(w.opts.Name, list)
+			err := w.matrix.Set(w.config.Name, list)
 			if err != nil {
 				select {
-				case w.opts.Errors <- err:
+				case w.config.Errors <- err:
 				default:
 				}
 

@@ -10,7 +10,7 @@ import (
 func TestCleanerAll(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 10; i++ {
@@ -21,11 +21,9 @@ func TestCleanerAll(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	opts := CleanerOptions{
+	cleaner := NewCleaner(ledger, CleanerConfig{
 		Delay: 10 * time.Millisecond,
-	}
-
-	cleaner := NewCleaner(ledger, opts)
+	})
 
 	time.Sleep(15 * time.Millisecond)
 
@@ -40,7 +38,7 @@ func TestCleanerAll(t *testing.T) {
 func TestCleanerMinRetention(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 10; i++ {
@@ -51,12 +49,10 @@ func TestCleanerMinRetention(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	opts := CleanerOptions{
+	cleaner := NewCleaner(ledger, CleanerConfig{
 		MinRetention: 5,
 		Delay:        10 * time.Millisecond,
-	}
-
-	cleaner := NewCleaner(ledger, opts)
+	})
 
 	time.Sleep(15 * time.Millisecond)
 
@@ -71,7 +67,7 @@ func TestCleanerMinRetention(t *testing.T) {
 func TestCleanerMaxRetention(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 20; i++ {
@@ -82,13 +78,11 @@ func TestCleanerMaxRetention(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	opts := CleanerOptions{
+	cleaner := NewCleaner(ledger, CleanerConfig{
 		MinRetention: 10,
 		MaxRetention: 5,
 		Delay:        10 * time.Millisecond,
-	}
-
-	cleaner := NewCleaner(ledger, opts)
+	})
 
 	time.Sleep(15 * time.Millisecond)
 
@@ -103,10 +97,10 @@ func TestCleanerMaxRetention(t *testing.T) {
 func TestCleanerTablePosition(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	table, err := CreateTable(db, TableOptions{Prefix: "table"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 20; i++ {
@@ -120,14 +114,12 @@ func TestCleanerTablePosition(t *testing.T) {
 	err = table.Set("foo", 10)
 	assert.NoError(t, err)
 
-	opts := CleanerOptions{
+	cleaner := NewCleaner(ledger, CleanerConfig{
 		MinRetention: 5,
 		MaxRetention: 15,
 		Tables:       []*Table{table},
 		Delay:        10 * time.Millisecond,
-	}
-
-	cleaner := NewCleaner(ledger, opts)
+	})
 
 	time.Sleep(15 * time.Millisecond)
 
@@ -142,10 +134,10 @@ func TestCleanerTablePosition(t *testing.T) {
 func TestCleanerMatrixPosition(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	matrix, err := CreateMatrix(db, MatrixOptions{Prefix: "matrix"})
+	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 20; i++ {
@@ -159,14 +151,12 @@ func TestCleanerMatrixPosition(t *testing.T) {
 	err = matrix.Set("foo", []uint64{10, 12})
 	assert.NoError(t, err)
 
-	opts := CleanerOptions{
+	cleaner := NewCleaner(ledger, CleanerConfig{
 		MinRetention: 5,
 		MaxRetention: 15,
 		Matrices:     []*Matrix{matrix},
 		Delay:        10 * time.Millisecond,
-	}
-
-	cleaner := NewCleaner(ledger, opts)
+	})
 
 	time.Sleep(15 * time.Millisecond)
 

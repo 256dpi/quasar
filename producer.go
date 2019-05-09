@@ -12,8 +12,8 @@ type tuple struct {
 	ack   func(error)
 }
 
-// ProducerOptions are used to configure a producer.
-type ProducerOptions struct {
+// ProducerConfig are used to configure a producer.
+type ProducerConfig struct {
 	// The size of the sent entry batches.
 	Batch int
 
@@ -25,7 +25,7 @@ type ProducerOptions struct {
 // to a ledger.
 type Producer struct {
 	ledger *Ledger
-	opts   ProducerOptions
+	config ProducerConfig
 	pipe   chan tuple
 	mutex  sync.RWMutex
 	once   sync.Once
@@ -33,12 +33,12 @@ type Producer struct {
 }
 
 // NewProducer will create and return a producer.
-func NewProducer(ledger *Ledger, opts ProducerOptions) *Producer {
+func NewProducer(ledger *Ledger, config ProducerConfig) *Producer {
 	// prepare producer
 	p := &Producer{
 		ledger: ledger,
-		opts:   opts,
-		pipe:   make(chan tuple, opts.Batch),
+		config: config,
+		pipe:   make(chan tuple, config.Batch),
 	}
 
 	// run worker
@@ -96,8 +96,8 @@ func (p *Producer) Close() {
 func (p *Producer) worker() error {
 	for {
 		// prepare entries and acks
-		entries := make([]Entry, 0, p.opts.Batch)
-		acks := make([]func(error), 0, p.opts.Batch)
+		entries := make([]Entry, 0, p.config.Batch)
+		acks := make([]func(error), 0, p.config.Batch)
 
 		// wait for first tuple
 		select {
@@ -113,7 +113,7 @@ func (p *Producer) worker() error {
 		}
 
 		// prepare timeout
-		tmt := time.After(p.opts.Timeout)
+		tmt := time.After(p.config.Timeout)
 
 		// await next tuple or timeout
 		for {
@@ -129,7 +129,7 @@ func (p *Producer) worker() error {
 				acks = append(acks, tpl.ack)
 
 				// continue if there is still space
-				if len(entries) < p.opts.Batch {
+				if len(entries) < p.config.Batch {
 					continue
 				}
 			case <-tmt:

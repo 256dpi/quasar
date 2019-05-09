@@ -10,12 +10,12 @@ import (
 func TestProducer(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
 	done := make(chan struct{})
 
-	producer := NewProducer(ledger, ProducerOptions{
+	producer := NewProducer(ledger, ProducerConfig{
 		Batch:   10,
 		Timeout: time.Millisecond,
 	})
@@ -45,14 +45,14 @@ func TestProducer(t *testing.T) {
 func BenchmarkProducer(b *testing.B) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	if err != nil {
 		panic(err)
 	}
 
 	done := make(chan struct{})
 
-	producer := NewProducer(ledger, ProducerOptions{
+	producer := NewProducer(ledger, ProducerConfig{
 		Batch:   100,
 		Timeout: time.Millisecond,
 	})

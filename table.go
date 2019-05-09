@@ -4,8 +4,8 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
-// TableOptions are used to configure a table.
-type TableOptions struct {
+// TableConfig are used to configure a table.
+type TableConfig struct {
 	// The prefix for all table keys.
 	Prefix string
 }
@@ -13,17 +13,17 @@ type TableOptions struct {
 // Table manages the storage of positions.
 type Table struct {
 	db     *DB
-	opts   TableOptions
+	config TableConfig
 	prefix []byte
 }
 
 // CreateTable will create a table that stores positions in the provided db.
-func CreateTable(db *DB, opts TableOptions) (*Table, error) {
+func CreateTable(db *DB, config TableConfig) (*Table, error) {
 	// create table
 	t := &Table{
 		db:     db,
-		opts:   opts,
-		prefix: append([]byte(opts.Prefix), ':'),
+		config: config,
+		prefix: append([]byte(config.Prefix), ':'),
 	}
 
 	return t, nil

@@ -4,8 +4,8 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
-// MatrixOptions are used to configure a matrix.
-type MatrixOptions struct {
+// MatrixConfig are used to configure a matrix.
+type MatrixConfig struct {
 	// The prefix for all matrix keys.
 	Prefix string
 }
@@ -13,17 +13,17 @@ type MatrixOptions struct {
 // Matrix manages the storage of positions markers.
 type Matrix struct {
 	db     *DB
-	opts   MatrixOptions
+	config MatrixConfig
 	prefix []byte
 }
 
 // CreateMatrix will create a matrix that stores positions in the provided db.
-func CreateMatrix(db *DB, opts MatrixOptions) (*Matrix, error) {
+func CreateMatrix(db *DB, config MatrixConfig) (*Matrix, error) {
 	// create matrix
 	t := &Matrix{
 		db:     db,
-		opts:   opts,
-		prefix: append([]byte(opts.Prefix), ':'),
+		config: config,
+		prefix: append([]byte(config.Prefix), ':'),
 	}
 
 	return t, nil

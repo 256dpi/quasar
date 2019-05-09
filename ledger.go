@@ -22,16 +22,16 @@ type Entry struct {
 	Payload []byte
 }
 
-// LedgerOptions are used to configure a ledger.
-type LedgerOptions struct {
+// LedgerConfig are used to configure a ledger.
+type LedgerConfig struct {
 	// The prefix for all ledger keys.
 	Prefix string
 }
 
 // Ledger manages the storage of sequential entries.
 type Ledger struct {
-	db   *DB
-	opts LedgerOptions
+	db     *DB
+	config LedgerConfig
 
 	entryPrefix []byte
 	cachePrefix []byte
@@ -48,13 +48,13 @@ type Ledger struct {
 // CreateLedger will create a ledger that stores entries in the provided db.
 // Read, write and delete requested can be issued concurrently to maximize
 // performance. However, only one goroutine may write entries at the same time.
-func CreateLedger(db *DB, opts LedgerOptions) (*Ledger, error) {
+func CreateLedger(db *DB, config LedgerConfig) (*Ledger, error) {
 	// create ledger
 	l := &Ledger{
 		db:          db,
-		opts:        opts,
-		entryPrefix: append([]byte(opts.Prefix), []byte(":#")...),
-		cachePrefix: append([]byte(opts.Prefix), []byte(":!")...),
+		config:      config,
+		entryPrefix: append([]byte(config.Prefix), []byte(":#")...),
+		cachePrefix: append([]byte(config.Prefix), []byte(":!")...),
 	}
 
 	// init ledger

@@ -13,7 +13,7 @@ func TestLedger(t *testing.T) {
 
 	// open
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -129,7 +129,7 @@ func TestLedger(t *testing.T) {
 func TestLedgerIndex(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -180,7 +180,7 @@ func TestLedgerIndex(t *testing.T) {
 func TestLedgerClear(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -218,7 +218,7 @@ func TestLedgerClear(t *testing.T) {
 func TestLedgerReset(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -261,7 +261,7 @@ func TestLedgerIsolation(t *testing.T) {
 	set(db, "ledger:#00000000000000000003", "c")
 	set(db, "z-ledger:#00000000000000000004", "d")
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -284,7 +284,7 @@ func TestLedgerIsolation(t *testing.T) {
 func TestLedgerMonotonicity(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -310,7 +310,7 @@ func TestLedgerMonotonicity(t *testing.T) {
 func TestLedgerReopen(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -322,7 +322,7 @@ func TestLedgerReopen(t *testing.T) {
 
 	db = openDB(false)
 
-	ledger, err = CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err = CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -345,7 +345,7 @@ func TestLedgerReopen(t *testing.T) {
 func TestLedgerReopenCollapsed(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -360,7 +360,7 @@ func TestLedgerReopenCollapsed(t *testing.T) {
 
 	db = openDB(false)
 
-	ledger, err = CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err = CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -377,7 +377,7 @@ func TestLedgerReopenCollapsed(t *testing.T) {
 func TestLedgerHugeDelete(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -408,7 +408,7 @@ func TestLedgerHugeDelete(t *testing.T) {
 func BenchmarkLedgerWrite(b *testing.B) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	if err != nil {
 		panic(err)
 	}
@@ -454,7 +454,7 @@ func BenchmarkLedgerWrite(b *testing.B) {
 func BenchmarkLedgerRead(b *testing.B) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	if err != nil {
 		panic(err)
 	}
@@ -495,7 +495,7 @@ func BenchmarkLedgerRead(b *testing.B) {
 func BenchmarkLedgerDelete(b *testing.B) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	if err != nil {
 		panic(err)
 	}

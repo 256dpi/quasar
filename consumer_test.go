@@ -11,10 +11,10 @@ import (
 func TestConsumer(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	table, err := CreateTable(db, TableOptions{Prefix: "table"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -29,14 +29,12 @@ func TestConsumer(t *testing.T) {
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	opts := ConsumerOptions{
+	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Batch:   10,
 		Entries: entries,
 		Errors:  errors,
-	}
-
-	consumer := NewConsumer(ledger, table, opts)
+	})
 
 	for {
 		counter++
@@ -57,9 +55,13 @@ func TestConsumer(t *testing.T) {
 	assert.Empty(t, errors)
 
 	entries = make(chan Entry, 10)
-	opts.Entries = entries
 
-	consumer = NewConsumer(ledger, table, opts)
+	consumer = NewConsumer(ledger, table, ConsumerConfig{
+		Name:    "foo",
+		Batch:   10,
+		Entries: entries,
+		Errors:  errors,
+	})
 
 	for {
 		counter++
@@ -90,24 +92,22 @@ func TestConsumer(t *testing.T) {
 func TestConsumerOnDemand(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	table, err := CreateTable(db, TableOptions{Prefix: "table"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	counter := 0
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	opts := ConsumerOptions{
+	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Batch:   10,
 		Entries: entries,
 		Errors:  errors,
-	}
-
-	consumer := NewConsumer(ledger, table, opts)
+	})
 
 	go func() {
 		for i := 1; i <= 100; i++ {
@@ -150,10 +150,10 @@ func TestConsumerOnDemand(t *testing.T) {
 func TestConsumerSkipping(t *testing.T) {
 	db := openDB(true)
 
-	ledger, err := CreateLedger(db, LedgerOptions{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	table, err := CreateTable(db, TableOptions{Prefix: "table"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -167,15 +167,13 @@ func TestConsumerSkipping(t *testing.T) {
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	opts := ConsumerOptions{
+	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Batch:   10,
 		Skip:    2,
 		Entries: entries,
 		Errors:  errors,
-	}
-
-	consumer := NewConsumer(ledger, table, opts)
+	})
 
 	entry := <-entries
 

@@ -24,7 +24,7 @@ func openDB(clear bool) *DB {
 	}
 
 	// open db
-	db, err := OpenDB(dir, DBOptions{GCInterval: time.Minute})
+	db, err := OpenDB(dir, DBConfig{GCInterval: time.Minute})
 	if err != nil {
 		panic(err)
 	}

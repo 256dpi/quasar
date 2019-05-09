@@ -6,8 +6,8 @@ import (
 	"gopkg.in/tomb.v2"
 )
 
-// ConsumerOptions are used to configure a consumer.
-type ConsumerOptions struct {
+// ConsumerConfig are used to configure a consumer.
+type ConsumerConfig struct {
 	// The name of the consumer.
 	Name string
 
@@ -28,7 +28,7 @@ type ConsumerOptions struct {
 type Consumer struct {
 	ledger *Ledger
 	table  *Table
-	opts   ConsumerOptions
+	config ConsumerConfig
 
 	head    uint64
 	skipped int
@@ -38,12 +38,12 @@ type Consumer struct {
 }
 
 // NewConsumer will create and return a new consumer.
-func NewConsumer(ledger *Ledger, table *Table, opts ConsumerOptions) *Consumer {
+func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer {
 	// prepare consumer
 	c := &Consumer{
 		ledger: ledger,
 		table:  table,
-		opts:   opts,
+		config: config,
 	}
 
 	// run worker
@@ -68,12 +68,12 @@ func (c *Consumer) Ack(position uint64) error {
 	c.head = position
 
 	// handle skipping
-	if c.opts.Skip > 0 {
+	if c.config.Skip > 0 {
 		// increment counter
 		c.skipped++
 
 		// return immediately when skipped
-		if c.skipped <= c.opts.Skip {
+		if c.skipped <= c.config.Skip {
 			return nil
 		}
 
@@ -82,7 +82,7 @@ func (c *Consumer) Ack(position uint64) error {
 	}
 
 	// save position in table
-	err := c.table.Set(c.opts.Name, position)
+	err := c.table.Set(c.config.Name, position)
 	if err != nil {
 		return err
 	}
@@ -103,10 +103,10 @@ func (c *Consumer) worker() error {
 	defer c.ledger.Unsubscribe(notifications)
 
 	// fetch stored position
-	position, err := c.table.Get(c.opts.Name)
+	position, err := c.table.Get(c.config.Name)
 	if err != nil {
 		select {
-		case c.opts.Errors <- err:
+		case c.config.Errors <- err:
 		default:
 		}
 
@@ -136,10 +136,10 @@ func (c *Consumer) worker() error {
 		}
 
 		// read entries
-		entries, err := c.ledger.Read(position, c.opts.Batch)
+		entries, err := c.ledger.Read(position, c.config.Batch)
 		if err != nil {
 			select {
-			case c.opts.Errors <- err:
+			case c.config.Errors <- err:
 			default:
 			}
 
@@ -149,7 +149,7 @@ func (c *Consumer) worker() error {
 		// put entries on pipe
 		for _, entry := range entries {
 			select {
-			case c.opts.Entries <- entry:
+			case c.config.Entries <- entry:
 				position = entry.Sequence + 1
 			case <-c.tomb.Dying():
 				return tomb.ErrDying

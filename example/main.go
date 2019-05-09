@@ -27,7 +27,7 @@ func producer(ledger *quasar.Ledger, done <-chan struct{}) {
 	defer wg.Done()
 
 	// create producer
-	producer := quasar.NewProducer(ledger, quasar.ProducerOptions{
+	producer := quasar.NewProducer(ledger, quasar.ProducerConfig{
 		Batch:   batch,
 		Timeout: time.Millisecond,
 	})
@@ -71,7 +71,7 @@ func consumer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) 
 	errors := make(chan error, 1)
 
 	// create reader
-	consumer := quasar.NewConsumer(ledger, table, quasar.ConsumerOptions{
+	consumer := quasar.NewConsumer(ledger, table, quasar.ConsumerConfig{
 		Name:    "example",
 		Batch:   batch,
 		Skip:    batch,
@@ -174,7 +174,7 @@ func cleaner(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
 	errors := make(chan error, 1)
 
 	// create cleaner
-	cleaner := quasar.NewCleaner(ledger, quasar.CleanerOptions{
+	cleaner := quasar.NewCleaner(ledger, quasar.CleanerConfig{
 		MinRetention: 10000,
 		MaxRetention: 100000,
 		Tables:       []*quasar.Table{table},
@@ -208,13 +208,13 @@ func main() {
 	}
 
 	// open db
-	db, err := quasar.OpenDB(dir, quasar.DBOptions{GCInterval: 10 * time.Second})
+	db, err := quasar.OpenDB(dir, quasar.DBConfig{GCInterval: 10 * time.Second})
 	if err != nil {
 		panic(err)
 	}
 
 	// open ledger
-	ledger, err := quasar.CreateLedger(db, quasar.LedgerOptions{
+	ledger, err := quasar.CreateLedger(db, quasar.LedgerConfig{
 		Prefix: "ledger",
 	})
 	if err != nil {
@@ -222,7 +222,7 @@ func main() {
 	}
 
 	// open table
-	table, err := quasar.CreateTable(db, quasar.TableOptions{
+	table, err := quasar.CreateTable(db, quasar.TableConfig{
 		Prefix: "table",
 	})
 	if err != nil {
