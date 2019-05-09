@@ -1,6 +1,8 @@
 package quasar
 
 import (
+	"sync"
+
 	"gopkg.in/tomb.v2"
 )
 
@@ -24,7 +26,11 @@ type Consumer struct {
 	ledger *Ledger
 	table  *Table
 	opts   ConsumerOptions
-	tomb   tomb.Tomb
+
+	head  uint64
+	mutex sync.Mutex
+
+	tomb tomb.Tomb
 }
 
 // NewConsumer will create and return a new consumer.
@@ -43,12 +49,30 @@ func NewConsumer(ledger *Ledger, table *Table, opts ConsumerOptions) *Consumer {
 }
 
 // Ack will acknowledge the consumption of message up to the specified position.
+// Positions that are lower than previously acknowledged positions are ignored.
 func (c *Consumer) Ack(position uint64) error {
+	// get current head
+	c.mutex.Lock()
+	head := c.head
+	c.mutex.Unlock()
+
+	// return immediately if lower or equal
+	if position <= head {
+		return nil
+	}
+
 	// save position in table
 	err := c.table.Set(c.opts.Name, position)
 	if err != nil {
 		return err
 	}
+
+	// write new head
+	c.mutex.Lock()
+	if c.head < position {
+		c.head = position
+	}
+	c.mutex.Unlock()
 
 	return nil
 }
