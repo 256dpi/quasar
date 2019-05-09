@@ -34,7 +34,7 @@ type Ledger struct {
 	config LedgerConfig
 
 	entryPrefix []byte
-	cachePrefix []byte
+	fieldPrefix []byte
 
 	receivers   sync.Map
 	writeMutex  sync.Mutex
@@ -54,7 +54,7 @@ func CreateLedger(db *DB, config LedgerConfig) (*Ledger, error) {
 		db:          db,
 		config:      config,
 		entryPrefix: append([]byte(config.Prefix), []byte(":#")...),
-		cachePrefix: append([]byte(config.Prefix), []byte(":!")...),
+		fieldPrefix: append([]byte(config.Prefix), []byte(":!")...),
 	}
 
 	// init ledger
@@ -71,7 +71,7 @@ func (l *Ledger) init() error {
 	var length int64
 	var head uint64
 
-	// read length and head from entries and cache
+	// read length and head from entries and fields
 	err := l.db.View(func(txn *badger.Txn) error {
 		// create iterator (key only)
 		iter := txn.NewIterator(badger.IteratorOptions{
@@ -97,10 +97,10 @@ func (l *Ledger) init() error {
 			head = seq
 		}
 
-		// read cached head if collapsed
+		// read stored head if collapsed
 		if length <= 0 {
-			// read cached head
-			item, err := txn.Get(l.makeCacheKey("head"))
+			// read stored head
+			item, err := txn.Get(l.makeFieldKey("head"))
 			if err != nil && err != badger.ErrKeyNotFound {
 				return err
 			}
@@ -167,9 +167,9 @@ func (l *Ledger) Write(entries ...Entry) error {
 			}
 		}
 
-		// cache head
+		// store head
 		return txn.SetEntry(&badger.Entry{
-			Key:   l.makeCacheKey("head"),
+			Key:   l.makeFieldKey("head"),
 			Value: []byte(strconv.FormatUint(head, 10)),
 		})
 	})
@@ -260,7 +260,7 @@ func (l *Ledger) Index(index int) (uint64, error) {
 	// prepare sequence
 	var sequence uint64
 
-	// read length and head from entries and cache
+	// find requested entry
 	err := l.db.View(func(txn *badger.Txn) error {
 		// create iterator (key only)
 		iter := txn.NewIterator(badger.IteratorOptions{
@@ -470,8 +470,8 @@ func (l *Ledger) Reset() error {
 		return err
 	}
 
-	// drop cache
-	err = l.db.DropPrefix(l.cachePrefix)
+	// drop fields
+	err = l.db.DropPrefix(l.fieldPrefix)
 	if err != nil {
 		return err
 	}
@@ -502,7 +502,7 @@ func (l *Ledger) makeEntryKey(seq uint64) []byte {
 	return append(append(b, l.entryPrefix...), EncodeSequence(seq, false)...)
 }
 
-func (l *Ledger) makeCacheKey(name string) []byte {
-	b := make([]byte, 0, len(l.cachePrefix)+SequenceLength)
-	return append(append(b, l.cachePrefix...), name...)
+func (l *Ledger) makeFieldKey(name string) []byte {
+	b := make([]byte, 0, len(l.fieldPrefix)+SequenceLength)
+	return append(append(b, l.fieldPrefix...), name...)
 }
