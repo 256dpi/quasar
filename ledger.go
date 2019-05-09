@@ -26,6 +26,9 @@ type Entry struct {
 type LedgerConfig struct {
 	// The prefix for all ledger keys.
 	Prefix string
+
+	// The amount of entries to cache in memory.
+	Cache int
 }
 
 // Ledger manages the storage of sequential entries.
@@ -33,6 +36,7 @@ type Ledger struct {
 	db     *DB
 	config LedgerConfig
 
+	cache       *Cache
 	entryPrefix []byte
 	fieldPrefix []byte
 
@@ -49,10 +53,17 @@ type Ledger struct {
 // Read, write and delete requested can be issued concurrently to maximize
 // performance. However, only one goroutine may write entries at the same time.
 func CreateLedger(db *DB, config LedgerConfig) (*Ledger, error) {
+	// prepare cache
+	var cache *Cache
+	if config.Cache > 0 {
+		cache = NewCache(config.Cache)
+	}
+
 	// create ledger
 	l := &Ledger{
 		db:          db,
 		config:      config,
+		cache:       cache,
 		entryPrefix: append([]byte(config.Prefix), []byte(":#")...),
 		fieldPrefix: append([]byte(config.Prefix), []byte(":!")...),
 	}
@@ -183,6 +194,9 @@ func (l *Ledger) Write(entries ...Entry) error {
 	l.head = head
 	l.mutex.Unlock()
 
+	// cache all entries
+	l.cache.Add(entries...)
+
 	// send notifications to all receivers and skip full receivers
 	l.receivers.Range(func(_, value interface{}) bool {
 		select {
@@ -201,6 +215,31 @@ func (l *Ledger) Write(entries ...Entry) error {
 func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 	// prepare list
 	list := make([]Entry, 0, amount)
+
+	// attempt to read from cache
+	l.cache.Scan(func(i int, entry Entry) bool {
+		// stop if start sequence is not in cache
+		if i == 0 && sequence < entry.Sequence {
+			return false
+		}
+
+		// otherwise add item if in range
+		if entry.Sequence >= sequence {
+			list = append(list, entry)
+		}
+
+		// stop if list is full
+		if len(list) >= amount {
+			return false
+		}
+
+		return true
+	})
+
+	// return cache list immediately
+	if len(list) > 0 {
+		return list, nil
+	}
 
 	// read entries
 	err := l.db.View(func(txn *badger.Txn) error {
@@ -443,6 +482,9 @@ func (l *Ledger) Clear() error {
 		return err
 	}
 
+	// reset cache
+	l.cache.Reset()
+
 	// reset length
 	l.mutex.Lock()
 	l.length = 0
@@ -475,6 +517,9 @@ func (l *Ledger) Reset() error {
 	if err != nil {
 		return err
 	}
+
+	// reset cache
+	l.cache.Reset()
 
 	// reset length
 	l.mutex.Lock()

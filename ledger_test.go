@@ -405,6 +405,56 @@ func TestLedgerHugeDelete(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestLedgerCache(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Cache: 3})
+	assert.NoError(t, err)
+	assert.NotNil(t, ledger)
+
+	err = ledger.Write(Entry{Sequence: 1, Payload: []byte("foo")})
+	assert.NoError(t, err)
+
+	// cached read
+
+	entries, err := ledger.Read(1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, []Entry{
+		{Sequence: 1, Payload: []byte("foo")},
+	}, entries)
+
+	err = ledger.Write(
+		Entry{Sequence: 2, Payload: []byte("bar")},
+		Entry{Sequence: 3, Payload: []byte("baz")},
+		Entry{Sequence: 4, Payload: []byte("qux")},
+	)
+	assert.NoError(t, err)
+
+	// not cached read
+
+	entries, err = ledger.Read(1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, []Entry{
+		{Sequence: 1, Payload: []byte("foo")},
+		{Sequence: 2, Payload: []byte("bar")},
+		{Sequence: 3, Payload: []byte("baz")},
+		{Sequence: 4, Payload: []byte("qux")},
+	}, entries)
+
+	// cached read
+
+	entries, err = ledger.Read(2, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, []Entry{
+		{Sequence: 2, Payload: []byte("bar")},
+		{Sequence: 3, Payload: []byte("baz")},
+		{Sequence: 4, Payload: []byte("qux")},
+	}, entries)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func BenchmarkLedgerWrite(b *testing.B) {
 	db := openDB(true)
 

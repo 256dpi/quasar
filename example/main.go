@@ -216,6 +216,7 @@ func main() {
 	// open ledger
 	ledger, err := quasar.CreateLedger(db, quasar.LedgerConfig{
 		Prefix: "ledger",
+		Cache:  batch * 10,
 	})
 	if err != nil {
 		panic(err)
