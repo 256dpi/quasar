@@ -77,6 +77,47 @@ func TestTable(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestTableMonotonicity(t *testing.T) {
+	db := openDB(true)
+
+	table, err := CreateTable(db, TableOptions{Prefix: "table"})
+	assert.NoError(t, err)
+	assert.NotNil(t, table)
+
+	err = table.Set("foo", 2)
+	assert.NoError(t, err)
+
+	position, err := table.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(2), position)
+
+	count, err := table.Count()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	assert.Equal(t, map[string]string{
+		"table:foo": "2",
+	}, dump(db))
+
+	err = table.Set("foo", 1)
+	assert.NoError(t, err)
+
+	position, err = table.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(2), position)
+
+	count, err = table.Count()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	assert.Equal(t, map[string]string{
+		"table:foo": "2",
+	}, dump(db))
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func TestTableRange(t *testing.T) {
 	db := openDB(true)
 

@@ -29,14 +29,48 @@ func CreateTable(db *DB, opts TableOptions) (*Table, error) {
 	return t, nil
 }
 
-// Set will write the specified position to the table.
+// Set will write the specified position to the table if it is higher as the
+// already stored position.
 func (t *Table) Set(name string, position uint64) error {
 	// set entry
 	err := t.db.Update(func(txn *badger.Txn) error {
-		return txn.SetEntry(&badger.Entry{
+		// compute key
+		key := t.makeKey(name)
+
+		// get current entry
+		item, err := txn.Get(key)
+		if err != nil && err != badger.ErrKeyNotFound {
+			return err
+		}
+
+		// check against current value
+		if item != nil {
+			// decode stored value
+			var seq uint64
+			err = item.Value(func(val []byte) error {
+				seq, err = DecodeSequence(val)
+				return err
+			})
+			if err != nil {
+				return err
+			}
+
+			// return immediately if lower or equal
+			if position <= seq {
+				return nil
+			}
+		}
+
+		// write new entry
+		err = txn.SetEntry(&badger.Entry{
 			Key:   t.makeKey(name),
 			Value: EncodeSequence(position, true),
 		})
+		if err != nil {
+			return err
+		}
+
+		return nil
 	})
 	if err != nil {
 		return err
