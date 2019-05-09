@@ -370,8 +370,11 @@ func (l *Ledger) partialDelete(start, needle []byte) ([]byte, int, error) {
 
 		// delete all entries
 		for iter.Seek(start); iter.Valid(); iter.Next() {
+			// copy key
+			key := iter.Item().KeyCopy(nil)
+
 			// delete entry
-			err := txn.Delete(iter.Item().KeyCopy(nil))
+			err := txn.Delete(key)
 			if err != nil {
 				return err
 			}
@@ -380,13 +383,13 @@ func (l *Ledger) partialDelete(start, needle []byte) ([]byte, int, error) {
 			counter++
 
 			// stop if found element is needle
-			if bytes.Equal(needle, iter.Item().Key()) {
+			if bytes.Equal(needle, key) {
 				break
 			}
 
 			// stop if exhausted
 			if counter >= int(l.db.MaxBatchCount()-10) {
-				end = iter.Item().KeyCopy(nil)
+				end = key
 				break
 			}
 		}
