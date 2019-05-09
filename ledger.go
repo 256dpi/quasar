@@ -195,7 +195,9 @@ func (l *Ledger) Write(entries ...Entry) error {
 	l.mutex.Unlock()
 
 	// cache all entries
-	l.cache.Add(entries...)
+	if l.cache != nil {
+		l.cache.Add(entries...)
+	}
 
 	// send notifications to all receivers and skip full receivers
 	l.receivers.Range(func(_, value interface{}) bool {
@@ -216,25 +218,27 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 	// prepare list
 	list := make([]Entry, 0, amount)
 
-	// attempt to read from cache
-	l.cache.Scan(func(i int, entry Entry) bool {
-		// stop if start sequence is not in cache
-		if i == 0 && sequence < entry.Sequence {
-			return false
-		}
+	// attempt to read from cache if available
+	if l.cache != nil {
+		l.cache.Scan(func(i int, entry Entry) bool {
+			// stop if start sequence is not in cache
+			if i == 0 && sequence < entry.Sequence {
+				return false
+			}
 
-		// otherwise add item if in range
-		if entry.Sequence >= sequence {
-			list = append(list, entry)
-		}
+			// otherwise add item if in range
+			if entry.Sequence >= sequence {
+				list = append(list, entry)
+			}
 
-		// stop if list is full
-		if len(list) >= amount {
-			return false
-		}
+			// stop if list is full
+			if len(list) >= amount {
+				return false
+			}
 
-		return true
-	})
+			return true
+		})
+	}
 
 	// return cache list immediately
 	if len(list) > 0 {
@@ -483,7 +487,9 @@ func (l *Ledger) Clear() error {
 	}
 
 	// reset cache
-	l.cache.Reset()
+	if l.cache != nil {
+		l.cache.Reset()
+	}
 
 	// reset length
 	l.mutex.Lock()
@@ -519,7 +525,9 @@ func (l *Ledger) Reset() error {
 	}
 
 	// reset cache
-	l.cache.Reset()
+	if l.cache != nil {
+		l.cache.Reset()
+	}
 
 	// reset length
 	l.mutex.Lock()
