@@ -64,7 +64,7 @@ func (r *Reader) worker() error {
 		}
 
 		// wait for notification if no new data in ledger
-		if r.ledger.Head() <= position {
+		if r.ledger.Head() < position {
 			select {
 			case <-notifications:
 			case <-r.tomb.Dying():

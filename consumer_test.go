@@ -208,3 +208,48 @@ func TestConsumerSkipping(t *testing.T) {
 	err = db.Close()
 	assert.NoError(t, err)
 }
+
+func TestConsumerUnblock(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	assert.NoError(t, err)
+
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	assert.NoError(t, err)
+
+	err = ledger.Write(Entry{
+		Sequence: uint64(1),
+		Payload:  []byte("foo"),
+	})
+	assert.NoError(t, err)
+
+	err = table.Set("foo", 1)
+	assert.NoError(t, err)
+
+	entries := make(chan Entry, 1)
+	errors := make(chan error, 1)
+
+	reader := NewConsumer(ledger, table, ConsumerConfig{
+		Name:    "foo",
+		Batch:   1,
+		Entries: entries,
+		Errors:  errors,
+	})
+
+	err = ledger.Write(Entry{
+		Sequence: uint64(2),
+		Payload:  []byte("foo"),
+	})
+	assert.NoError(t, err)
+
+	entry := <-entries
+	assert.Equal(t, uint64(2), entry.Sequence)
+	assert.Equal(t, []byte("foo"), entry.Payload)
+
+	reader.Close()
+	assert.Empty(t, errors)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}

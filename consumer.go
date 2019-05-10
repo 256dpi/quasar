@@ -125,7 +125,7 @@ func (c *Consumer) worker() error {
 		}
 
 		// wait for notification if no new data in ledger
-		if c.ledger.Head() <= position {
+		if c.ledger.Head() < position {
 			select {
 			case <-notifications:
 			case <-c.tomb.Dying():

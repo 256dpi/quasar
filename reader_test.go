@@ -73,4 +73,46 @@ func TestReader(t *testing.T) {
 
 	reader.Close()
 	assert.Empty(t, errors)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
+func TestReaderUnblock(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	assert.NoError(t, err)
+
+	err = ledger.Write(Entry{
+		Sequence: uint64(1),
+		Payload:  []byte("foo"),
+	})
+	assert.NoError(t, err)
+
+	entries := make(chan Entry, 1)
+	errors := make(chan error, 1)
+
+	reader := NewReader(ledger, ReaderConfig{
+		Start:   ledger.Head() + 1,
+		Batch:   1,
+		Entries: entries,
+		Errors:  errors,
+	})
+
+	err = ledger.Write(Entry{
+		Sequence: uint64(2),
+		Payload:  []byte("foo"),
+	})
+	assert.NoError(t, err)
+
+	entry := <-entries
+	assert.Equal(t, uint64(2), entry.Sequence)
+	assert.Equal(t, []byte("foo"), entry.Payload)
+
+	reader.Close()
+	assert.Empty(t, errors)
+
+	err = db.Close()
+	assert.NoError(t, err)
 }
