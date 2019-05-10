@@ -65,11 +65,14 @@ func TestTable(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 
-	// count
+	// clear
+
+	err = table.Clear()
+	assert.NoError(t, err)
 
 	count, err = table.Count()
 	assert.NoError(t, err)
-	assert.Equal(t, 1, count)
+	assert.Equal(t, 0, count)
 
 	// close
 

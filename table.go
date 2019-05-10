@@ -206,6 +206,19 @@ func (t *Table) Range() (uint64, uint64, error) {
 	return min, max, nil
 }
 
+// Clear will drop all table entries. Clear will temporarily block concurrent
+// writes and deletes and lock the underlying database. Other users uf the same
+// database may receive errors due to the locked database.
+func (t *Table) Clear() error {
+	// drop all entries
+	err := t.db.DropPrefix(t.prefix)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (t *Table) makeKey(name string) []byte {
 	b := make([]byte, 0, len(t.prefix)+len(name))
 	return append(append(b, t.prefix...), []byte(name)...)
