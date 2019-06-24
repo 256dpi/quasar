@@ -9,9 +9,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/256dpi/quasar"
-
+	"github.com/256dpi/god"
 	"github.com/montanaflynn/stats"
+
+	"github.com/256dpi/quasar"
 )
 
 var wg sync.WaitGroup
@@ -179,6 +180,9 @@ func cleaner(ledger *quasar.Ledger, done <-chan struct{}) {
 }
 
 func main() {
+	// debug
+	god.Debug()
+
 	// get dir
 	dir, err := filepath.Abs("./data")
 	if err != nil {
