@@ -185,6 +185,20 @@ func (w *Worker) worker() error {
 			// mark sequence
 			markers[sequence] = true
 
+			// handle skipping
+			if w.config.Skip > 0 {
+				// increment counter
+				skipped++
+
+				// return immediately when skipped
+				if skipped <= w.config.Skip {
+					break
+				}
+
+				// otherwise reset counter
+				skipped = 0
+			}
+
 			// compile list
 			var list []uint64
 			for seq, ok := range markers {
@@ -213,20 +227,6 @@ func (w *Worker) worker() error {
 				// remove first positive
 				delete(markers, list[0])
 				list = list[1:]
-			}
-
-			// handle skipping
-			if w.config.Skip > 0 {
-				// increment counter
-				skipped++
-
-				// return immediately when skipped
-				if skipped <= w.config.Skip {
-					break
-				}
-
-				// otherwise reset counter
-				skipped = 0
 			}
 
 			// store sequences in matrix
