@@ -32,7 +32,7 @@ func CreateMatrix(db *DB, config MatrixConfig) (*Matrix, error) {
 // Set will write the specified sequences to the matrix.
 func (m *Matrix) Set(name string, sequences []uint64) error {
 	// set entry
-	err := m.db.Update(func(txn *badger.Txn) error {
+	err := retryUpdate(m.db, func(txn *badger.Txn) error {
 		return txn.SetEntry(&badger.Entry{
 			Key:   m.makeKey(name),
 			Value: EncodeSequences(sequences),
@@ -81,7 +81,7 @@ func (m *Matrix) Get(name string) ([]uint64, error) {
 // Delete will remove the specified sequences from the matrix.
 func (m *Matrix) Delete(name string) error {
 	// delete item
-	err := m.db.Update(func(txn *badger.Txn) error {
+	err := retryUpdate(m.db, func(txn *badger.Txn) error {
 		return txn.Delete(m.makeKey(name))
 	})
 	if err != nil {

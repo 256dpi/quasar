@@ -33,7 +33,7 @@ func CreateTable(db *DB, config TableConfig) (*Table, error) {
 // already stored position.
 func (t *Table) Set(name string, position uint64) error {
 	// set entry
-	err := t.db.Update(func(txn *badger.Txn) error {
+	err := retryUpdate(t.db, func(txn *badger.Txn) error {
 		// compute key
 		key := t.makeKey(name)
 
@@ -115,7 +115,7 @@ func (t *Table) Get(name string) (uint64, error) {
 // Delete will remove the specified position from the table.
 func (t *Table) Delete(name string) error {
 	// delete item
-	err := t.db.Update(func(txn *badger.Txn) error {
+	err := retryUpdate(t.db, func(txn *badger.Txn) error {
 		return txn.Delete(t.makeKey(name))
 	})
 	if err != nil {

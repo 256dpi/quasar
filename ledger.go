@@ -165,7 +165,7 @@ func (l *Ledger) Write(entries ...Entry) error {
 	}
 
 	// begin database update
-	err := l.db.Update(func(txn *badger.Txn) error {
+	err := retryUpdate(l.db, func(txn *badger.Txn) error {
 		// add all entries
 		for _, entry := range entries {
 			// add entry
@@ -402,7 +402,11 @@ func (l *Ledger) partialDelete(start, needle []byte) ([]byte, int, error) {
 	var end []byte
 
 	// begin database update
-	err := l.db.Update(func(txn *badger.Txn) error {
+	err := retryUpdate(l.db, func(txn *badger.Txn) error {
+		// reset effects
+		counter = 0
+		end = nil
+
 		// prepare options
 		opts := badger.DefaultIteratorOptions
 		opts.Prefix = l.entryPrefix
