@@ -1,7 +1,7 @@
 package quasar
 
 import (
-	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/badger/v2"
 )
 
 // MatrixConfig are used to configure a matrix.

@@ -1,7 +1,7 @@
 package quasar
 
 import (
-	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/badger/v2"
 )
 
 // TableConfig are used to configure a table.

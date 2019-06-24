@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/badger/v2"
 )
 
 // ErrNotMonotonic is returned for write attempts that are not monotonic.
