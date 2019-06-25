@@ -133,7 +133,11 @@ func (m *Matrix) Range() (uint64, uint64, error) {
 		opts.Prefix = m.prefix
 
 		// create iterator
-		iter := txn.NewIterator(badger.DefaultIteratorOptions)
+		iter := txn.NewIterator(badger.IteratorOptions{
+			Prefix:         m.prefix,
+			PrefetchValues: true,
+			PrefetchSize:   100,
+		})
 		defer iter.Close()
 
 		// compute start

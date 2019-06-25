@@ -162,12 +162,12 @@ func (t *Table) Range() (uint64, uint64, error) {
 
 	// iterate over all keys
 	err := t.db.View(func(txn *badger.Txn) error {
-		// prepare options
-		opts := badger.DefaultIteratorOptions
-		opts.Prefix = t.prefix
-
 		// create iterator
-		iter := txn.NewIterator(badger.DefaultIteratorOptions)
+		iter := txn.NewIterator(badger.IteratorOptions{
+			Prefix:         t.prefix,
+			PrefetchValues: true,
+			PrefetchSize:   100,
+		})
 		defer iter.Close()
 
 		// compute start

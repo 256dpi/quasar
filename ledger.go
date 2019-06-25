@@ -249,12 +249,12 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 
 	// read entries
 	err := l.db.View(func(txn *badger.Txn) error {
-		// prepare options
-		opts := badger.DefaultIteratorOptions
-		opts.Prefix = l.entryPrefix
-
 		// create iterator
-		iter := txn.NewIterator(opts)
+		iter := txn.NewIterator(badger.IteratorOptions{
+			Prefix:         l.entryPrefix,
+			PrefetchValues: true,
+			PrefetchSize:   100,
+		})
 		defer iter.Close()
 
 		// compute start
@@ -332,8 +332,8 @@ func (l *Ledger) Index(index int) (uint64, bool, error) {
 
 		// create iterator (key only)
 		iter := txn.NewIterator(badger.IteratorOptions{
-			Reverse: backward,
 			Prefix:  l.entryPrefix,
+			Reverse: backward,
 		})
 		defer iter.Close()
 
@@ -452,12 +452,10 @@ func (l *Ledger) partialDelete(start, needle []byte) ([]byte, int, error) {
 		counter = 0
 		end = nil
 
-		// prepare options
-		opts := badger.DefaultIteratorOptions
-		opts.Prefix = l.entryPrefix
-
 		// create iterator
-		iter := txn.NewIterator(badger.IteratorOptions{})
+		iter := txn.NewIterator(badger.IteratorOptions{
+			Prefix: l.entryPrefix,
+		})
 		defer iter.Close()
 
 		// delete all entries
