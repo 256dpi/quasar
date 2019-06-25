@@ -1,6 +1,8 @@
 package quasar
 
 import (
+	"io"
+	"log"
 	"os"
 	"time"
 
@@ -17,6 +19,9 @@ type DBConfig struct {
 
 	// The channel on which errors are sent.
 	Errors chan<- error
+
+	// The sink used for logging.
+	LogSink io.Writer
 }
 
 // OpenDB will open or create the specified db.
@@ -32,6 +37,11 @@ func OpenDB(dir string, config DBConfig) (*DB, error) {
 	bo.Dir = dir
 	bo.ValueDir = dir
 	bo.Logger = nil
+
+	// set logger if available
+	if config.LogSink != nil {
+		bo.Logger = createLogger(config.LogSink)
+	}
 
 	// open db
 	db, err := badger.Open(bo)
@@ -61,4 +71,30 @@ func OpenDB(dir string, config DBConfig) (*DB, error) {
 	}
 
 	return db, nil
+}
+
+type logger struct {
+	*log.Logger
+}
+
+func createLogger(sink io.Writer) *logger {
+	return &logger{
+		Logger: log.New(sink, "quasar ", log.LstdFlags),
+	}
+}
+
+func (l *logger) Errorf(f string, v ...interface{}) {
+	l.Printf("ERROR: "+f, v...)
+}
+
+func (l *logger) Warningf(f string, v ...interface{}) {
+	l.Printf("WARNING: "+f, v...)
+}
+
+func (l *logger) Infof(f string, v ...interface{}) {
+	l.Printf("INFO: "+f, v...)
+}
+
+func (l *logger) Debugf(f string, v ...interface{}) {
+	l.Printf("DEBUG: "+f, v...)
 }
