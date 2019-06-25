@@ -57,7 +57,7 @@ func producer(ledger *quasar.Ledger, done <-chan struct{}) {
 
 		// limit rate
 		select {
-		case <-time.After(5 * time.Microsecond):
+		default:
 		case <-done:
 			return
 		}
