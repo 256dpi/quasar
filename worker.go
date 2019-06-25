@@ -1,10 +1,15 @@
 package quasar
 
 import (
+	"errors"
 	"sort"
 
 	"gopkg.in/tomb.v2"
 )
+
+// ErrInvalidSequence is returned if Ack() is called with a sequences that has
+// not yet been processed by the worker.
+var ErrInvalidSequence = errors.New("invalid sequence")
 
 // WorkerConfig are used to configure a worker.
 type WorkerConfig struct {
@@ -182,6 +187,17 @@ func (w *Worker) worker() error {
 			// remove entry from queue
 			queue = queue[1:]
 		case sequence := <-w.marks:
+			// check sequence
+			_, ok := markers[sequence]
+			if !ok {
+				select {
+				case w.config.Errors <- ErrInvalidSequence:
+				default:
+				}
+
+				return ErrInvalidSequence
+			}
+
 			// mark sequence
 			markers[sequence] = true
 

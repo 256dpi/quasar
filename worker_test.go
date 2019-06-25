@@ -331,3 +331,40 @@ func TestWorkerUnblock(t *testing.T) {
 	err = db.Close()
 	assert.NoError(t, err)
 }
+
+func TestWorkerInvalidSequence(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	assert.NoError(t, err)
+
+	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	assert.NoError(t, err)
+
+	errors := make(chan error, 1)
+
+	reader := NewWorker(ledger, matrix, WorkerConfig{
+		Name:    "foo",
+		Batch:   1,
+		Window:  10,
+		Entries: make(chan Entry, 1),
+		Errors:  errors,
+	})
+
+	err = ledger.Write(Entry{
+		Sequence: uint64(1),
+		Payload:  []byte("foo"),
+	})
+	assert.NoError(t, err)
+
+	reader.Ack(2)
+
+	err = <-errors
+	assert.Equal(t, ErrInvalidSequence, err)
+
+	reader.Close()
+	assert.Empty(t, errors)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
