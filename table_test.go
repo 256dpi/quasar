@@ -34,7 +34,7 @@ func TestTable(t *testing.T) {
 	assert.Equal(t, 1, count)
 
 	assert.Equal(t, map[string]string{
-		"table:foo": "1",
+		"table!foo": "1",
 	}, dump(db))
 
 	// delete
@@ -99,7 +99,7 @@ func TestTableMonotonicity(t *testing.T) {
 	assert.Equal(t, 1, count)
 
 	assert.Equal(t, map[string]string{
-		"table:foo": "2",
+		"table!foo": "2",
 	}, dump(db))
 
 	err = table.Set("foo", 1)
@@ -114,7 +114,7 @@ func TestTableMonotonicity(t *testing.T) {
 	assert.Equal(t, 1, count)
 
 	assert.Equal(t, map[string]string{
-		"table:foo": "2",
+		"table!foo": "2",
 	}, dump(db))
 
 	err = db.Close()
@@ -157,8 +157,8 @@ func TestTableIsolation(t *testing.T) {
 	db := openDB(true)
 
 	set(db, "foo", "00000000000000000001")
-	set(db, "table:foo", "00000000000000000002")
-	set(db, "z-table:foo", "00000000000000000003")
+	set(db, "table!foo", "00000000000000000002")
+	set(db, "z-table!foo", "00000000000000000003")
 
 	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)

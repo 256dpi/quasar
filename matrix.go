@@ -23,7 +23,7 @@ func CreateMatrix(db *DB, config MatrixConfig) (*Matrix, error) {
 	t := &Matrix{
 		db:     db,
 		config: config,
-		prefix: append([]byte(config.Prefix), ':'),
+		prefix: append([]byte(config.Prefix), '!'),
 	}
 
 	return t, nil

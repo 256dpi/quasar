@@ -49,8 +49,8 @@ func TestLedger(t *testing.T) {
 	assert.Equal(t, uint64(1), head)
 
 	assert.Equal(t, map[string]string{
-		"ledger:!head":                 "1",
-		"ledger:#00000000000000000001": "foo",
+		"ledger!head":                 "1",
+		"ledger#00000000000000000001": "foo",
 	}, dump(db))
 
 	// write multiple
@@ -81,11 +81,11 @@ func TestLedger(t *testing.T) {
 	assert.Equal(t, uint64(4), head)
 
 	assert.Equal(t, map[string]string{
-		"ledger:!head":                 "4",
-		"ledger:#00000000000000000001": "foo",
-		"ledger:#00000000000000000002": "bar",
-		"ledger:#00000000000000000003": "baz",
-		"ledger:#00000000000000000004": "qux",
+		"ledger!head":                 "4",
+		"ledger#00000000000000000001": "foo",
+		"ledger#00000000000000000002": "bar",
+		"ledger#00000000000000000003": "baz",
+		"ledger#00000000000000000004": "qux",
 	}, dump(db))
 
 	// read partial
@@ -116,8 +116,8 @@ func TestLedger(t *testing.T) {
 	assert.Equal(t, uint64(4), head)
 
 	assert.Equal(t, map[string]string{
-		"ledger:!head":                 "4",
-		"ledger:#00000000000000000004": "qux",
+		"ledger!head":                 "4",
+		"ledger#00000000000000000004": "qux",
 	}, dump(db))
 
 	// close
@@ -208,7 +208,7 @@ func TestLedgerClear(t *testing.T) {
 	assert.Equal(t, uint64(4), head)
 
 	assert.Equal(t, map[string]string{
-		"ledger:!head": "4",
+		"ledger!head": "4",
 	}, dump(db))
 
 	err = db.Close()
@@ -256,10 +256,10 @@ func TestLedgerIsolation(t *testing.T) {
 
 	set(db, "00000000000000000001", "a")
 	set(db, "e:00000000000000000002", "b")
-	set(db, "ledger:!head", "3")
-	set(db, "ledger:#00000000000000000003", "c")
-	set(db, "ledger:#00000000000000000003", "c")
-	set(db, "z-ledger:#00000000000000000004", "d")
+	set(db, "ledger!head", "3")
+	set(db, "ledger#00000000000000000003", "c")
+	set(db, "ledger#00000000000000000003", "c")
+	set(db, "z-ledger#00000000000000000004", "d")
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)

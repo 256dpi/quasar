@@ -23,7 +23,7 @@ func CreateTable(db *DB, config TableConfig) (*Table, error) {
 	t := &Table{
 		db:     db,
 		config: config,
-		prefix: append([]byte(config.Prefix), ':'),
+		prefix: append([]byte(config.Prefix), '!'),
 	}
 
 	return t, nil

@@ -64,8 +64,8 @@ func CreateLedger(db *DB, config LedgerConfig) (*Ledger, error) {
 		db:          db,
 		config:      config,
 		cache:       cache,
-		entryPrefix: append([]byte(config.Prefix), []byte(":#")...),
-		fieldPrefix: append([]byte(config.Prefix), []byte(":!")...),
+		entryPrefix: append([]byte(config.Prefix), '#'),
+		fieldPrefix: append([]byte(config.Prefix), '!'),
 	}
 
 	// init ledger
@@ -512,7 +512,7 @@ func (l *Ledger) Clear() error {
 	return nil
 }
 
-// Reset will drop all ledger entries and reset the head. Reset  will
+// Reset will drop all ledger entries and reset the head. Reset will
 // temporarily block concurrent writes and deletes and lock the underlying
 // database. Other users uf the same database may receive errors due to the
 // locked database.
@@ -569,6 +569,6 @@ func (l *Ledger) makeEntryKey(seq uint64) []byte {
 }
 
 func (l *Ledger) makeFieldKey(name string) []byte {
-	b := make([]byte, 0, len(l.fieldPrefix)+SequenceLength)
+	b := make([]byte, 0, len(l.fieldPrefix)+len(name))
 	return append(append(b, l.fieldPrefix...), name...)
 }

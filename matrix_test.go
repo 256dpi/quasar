@@ -34,7 +34,7 @@ func TestMatrix(t *testing.T) {
 	assert.Equal(t, 1, count)
 
 	assert.Equal(t, map[string]string{
-		"matrix:foo": "1",
+		"matrix!foo": "1",
 	}, dump(db))
 
 	// delete
@@ -116,8 +116,8 @@ func TestMatrixIsolation(t *testing.T) {
 	db := openDB(true)
 
 	set(db, "foo", "1")
-	set(db, "matrix:foo", "2")
-	set(db, "z-matrix:foo", "3")
+	set(db, "matrix!foo", "2")
+	set(db, "z-matrix!foo", "3")
 
 	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
 	assert.NoError(t, err)
