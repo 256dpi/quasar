@@ -80,6 +80,23 @@ func (c *Cleaner) worker() error {
 			return err
 		}
 
+		// prefetch max retention position. this will make sure that we properly
+		// honor the low positions of tables and matrices if a lot of entries are
+		// written in between
+		var maxPosition uint64
+		if c.config.MaxRetention > 0 {
+			// get maximal retention position
+			maxPosition, _, err = c.ledger.Index(-(c.config.MaxRetention + 1))
+			if err != nil {
+				select {
+				case c.config.Errors <- err:
+				default:
+				}
+
+				return err
+			}
+		}
+
 		// honor lowest table positions
 		for _, table := range c.config.Tables {
 			// get lowest position
@@ -118,20 +135,8 @@ func (c *Cleaner) worker() error {
 			}
 		}
 
-		// honor max retention if configured and position has been changed
+		// honor max retention if configured
 		if c.config.MaxRetention > 0 {
-			// get maximal retention position
-			maxPosition, _, err := c.ledger.Index(-(c.config.MaxRetention + 1))
-			if err != nil {
-				select {
-				case c.config.Errors <- err:
-				default:
-				}
-
-				return err
-			}
-
-			// set to highest position
 			if deletePosition < maxPosition {
 				deletePosition = maxPosition
 			}
