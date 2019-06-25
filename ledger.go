@@ -79,7 +79,7 @@ func CreateLedger(db *DB, config LedgerConfig) (*Ledger, error) {
 
 func (l *Ledger) init() error {
 	// prepare length and head
-	var length int64
+	var length int
 	var head uint64
 
 	// read length and head from entries and fields
@@ -136,7 +136,7 @@ func (l *Ledger) init() error {
 	}
 
 	// set length and head
-	l.length = int(length)
+	l.length = length
 	l.head = head
 
 	return nil
@@ -151,7 +151,9 @@ func (l *Ledger) Write(entries ...Entry) error {
 	defer l.writeMutex.Unlock()
 
 	// get head
-	head := l.Head()
+	l.mutex.Lock()
+	head := l.head
+	l.mutex.Unlock()
 
 	// check and update head
 	for _, entry := range entries {
