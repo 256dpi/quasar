@@ -14,8 +14,8 @@ type CleanerConfig struct {
 	// The maximal amount of entries to keep.
 	MaxRetention int
 
-	// The delay between cleanings.
-	Delay time.Duration
+	// The interval of cleanings.
+	Interval time.Duration
 
 	// The tables to check for minimal positions.
 	Tables []*Table
@@ -59,36 +59,25 @@ func (c *Cleaner) worker() error {
 	for {
 		// wait for trigger or close
 		select {
-		case <-time.After(c.config.Delay):
+		case <-time.After(c.config.Interval):
 		case <-c.tomb.Dying():
 			return tomb.ErrDying
 		}
 
-		// skip if ledger is too small
-		if c.config.MinRetention > 0 && c.ledger.Length() <= c.config.MinRetention {
+		// skip if ledger is empty or smaller than the minimal retention
+		if c.ledger.Length() <= c.config.MinRetention {
 			continue
 		}
 
-		// set current head as delete position
-		deletePosition := c.ledger.Head()
-
-		// honor minimal retention position if configured
-		if c.config.MinRetention > 0 {
-			// get minimal retention position
-			minPosition, _, err := c.ledger.Index(-(c.config.MinRetention + 1))
-			if err != nil {
-				select {
-				case c.config.Errors <- err:
-				default:
-				}
-
-				return err
+		// get initial position honoring the minimal retention
+		deletePosition, _, err := c.ledger.Index(-(c.config.MinRetention + 1))
+		if err != nil {
+			select {
+			case c.config.Errors <- err:
+			default:
 			}
 
-			// set to minimal position if valid
-			if minPosition > 0 {
-				deletePosition = minPosition
-			}
+			return err
 		}
 
 		// honor lowest table positions
@@ -142,14 +131,14 @@ func (c *Cleaner) worker() error {
 				return err
 			}
 
-			// set to highest position if valid
-			if maxPosition > 0 && deletePosition < maxPosition {
+			// set to highest position
+			if deletePosition < maxPosition {
 				deletePosition = maxPosition
 			}
 		}
 
 		// delete entries
-		err := c.ledger.Delete(deletePosition)
+		err = c.ledger.Delete(deletePosition)
 		if err != nil {
 			select {
 			case c.config.Errors <- err:

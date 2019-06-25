@@ -170,7 +170,7 @@ func cleaner(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
 		MinRetention: 10000,
 		MaxRetention: 100000,
 		Tables:       []*quasar.Table{table},
-		Delay:        100 * time.Millisecond,
+		Interval:     100 * time.Millisecond,
 		Errors:       errors,
 	})
 

@@ -161,7 +161,7 @@ func cleaner(ledger *quasar.Ledger, done <-chan struct{}) {
 	cleaner := quasar.NewCleaner(ledger, quasar.CleanerConfig{
 		MinRetention: 10000,
 		MaxRetention: 100000,
-		Delay:        100 * time.Millisecond,
+		Interval:     100 * time.Millisecond,
 		Errors:       errors,
 	})
 
