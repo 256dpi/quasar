@@ -36,19 +36,17 @@ func producer(ledger *quasar.Ledger, done <-chan struct{}) {
 	// ensure closing
 	defer producer.Close()
 
-	// prepare sequence
-	var sequence uint64
-
 	// write entries forever
 	for {
-		// increment sequence
-		sequence++
-
 		// write entry
 		producer.Write(quasar.Entry{
-			Sequence: sequence,
+			Sequence: quasar.GenerateSequence(1),
 			Payload:  []byte(time.Now().Format(time.RFC3339Nano)),
-		}, nil)
+		}, func(err error) {
+			if err != nil {
+				panic(err)
+			}
+		})
 
 		// increment
 		mutex.Lock()
