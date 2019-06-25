@@ -114,7 +114,7 @@ func consumer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) 
 	}
 }
 
-func printer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
+func printer(ledger *quasar.Ledger, done <-chan struct{}) {
 	defer wg.Done()
 
 	// create ticker
@@ -146,12 +146,6 @@ func printer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
 		p95, _ := stats.Percentile(d, 95)
 		p99, _ := stats.Percentile(d, 99)
 
-		// get tail
-		tail, _, err := table.Range()
-		if err != nil {
-			panic(err)
-		}
-
 		// print rate
 		fmt.Printf("send: %d msg/s, ", s)
 		fmt.Printf("recv %d msgs/s, ", r)
@@ -161,8 +155,7 @@ func printer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
 		fmt.Printf("p95: %.2fms, ", p95)
 		fmt.Printf("p99: %.2fms, ", p99)
 		fmt.Printf("max: %.2fms, ", max)
-		fmt.Printf("length: %d, ", ledger.Length())
-		fmt.Printf("diff: %d\n", ledger.Head()-tail)
+		fmt.Printf("length: %d\n", ledger.Length())
 	}
 }
 
@@ -240,7 +233,7 @@ func main() {
 	go producer(ledger, done)
 	go consumer(ledger, table, done)
 	go cleaner(ledger, table, done)
-	go printer(ledger, table, done)
+	go printer(ledger, done)
 
 	// prepare exit
 	exit := make(chan os.Signal, 1)
