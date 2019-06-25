@@ -75,7 +75,7 @@ func (c *Cleaner) worker() error {
 		// honor minimal retention position if configured
 		if c.config.MinRetention > 0 {
 			// get minimal retention position
-			minPosition, err := c.ledger.Index(-(c.config.MinRetention + 1))
+			minPosition, _, err := c.ledger.Index(-(c.config.MinRetention + 1))
 			if err != nil {
 				select {
 				case c.config.Errors <- err:
@@ -132,7 +132,7 @@ func (c *Cleaner) worker() error {
 		// honor max retention if configured and position has been changed
 		if c.config.MaxRetention > 0 {
 			// get maximal retention position
-			maxPosition, err := c.ledger.Index(-(c.config.MaxRetention + 1))
+			maxPosition, _, err := c.ledger.Index(-(c.config.MaxRetention + 1))
 			if err != nil {
 				select {
 				case c.config.Errors <- err:

@@ -291,8 +291,10 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 }
 
 // Index will return the sequence of the specified index in the ledger. Negative
-// indexes are counted backwards from the head.
-func (l *Ledger) Index(index int) (uint64, error) {
+// indexes are counted backwards from the head. If the index exceeds the current
+// length, the sequence of the last entry and false is returned. If the ledger
+// is empty the current head or if fresh zero and false will be returned.
+func (l *Ledger) Index(index int) (uint64, bool, error) {
 	// compute direction
 	backward := index < 0
 
@@ -305,8 +307,29 @@ func (l *Ledger) Index(index int) (uint64, error) {
 	// prepare sequence
 	var sequence uint64
 
+	// prepare flag
+	var existing bool
+
 	// find requested entry
 	err := l.db.View(func(txn *badger.Txn) error {
+		// read stored head
+		item, err := txn.Get(l.makeFieldKey("head"))
+		if err != nil && err != badger.ErrKeyNotFound {
+			return err
+		}
+
+		// parse stored head if present
+		if item != nil {
+			// parse length
+			err = item.Value(func(val []byte) error {
+				sequence, err = strconv.ParseUint(string(val), 10, 64)
+				return err
+			})
+			if err != nil {
+				return err
+			}
+		}
+
 		// create iterator (key only)
 		iter := txn.NewIterator(badger.IteratorOptions{
 			Reverse: backward,
@@ -325,14 +348,6 @@ func (l *Ledger) Index(index int) (uint64, error) {
 
 		// iterate over all keys
 		for iter.Seek(start); iter.Valid(); iter.Next() {
-			// increment length
-			counter++
-
-			// check counter
-			if counter < (index + 1) {
-				continue
-			}
-
 			// otherwise parse key
 			seq, err := DecodeSequence(iter.Item().Key()[len(l.entryPrefix):])
 			if err != nil {
@@ -342,16 +357,27 @@ func (l *Ledger) Index(index int) (uint64, error) {
 			// set sequence
 			sequence = seq
 
+			// increment length
+			counter++
+
+			// check counter
+			if counter < (index + 1) {
+				continue
+			}
+
+			// set flag
+			existing = true
+
 			break
 		}
 
 		return nil
 	})
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 
-	return sequence, nil
+	return sequence, existing, nil
 }
 
 // Delete will remove all entries up to and including the specified sequence

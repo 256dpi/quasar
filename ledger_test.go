@@ -133,16 +133,19 @@ func TestLedgerIndex(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
-	index, err := ledger.Index(0)
+	index, found, err := ledger.Index(0)
 	assert.NoError(t, err)
+	assert.False(t, found)
 	assert.Equal(t, uint64(0), index)
 
-	index, err = ledger.Index(2)
+	index, found, err = ledger.Index(2)
 	assert.NoError(t, err)
+	assert.False(t, found)
 	assert.Equal(t, uint64(0), index)
 
-	index, err = ledger.Index(-2)
+	index, found, err = ledger.Index(-2)
 	assert.NoError(t, err)
+	assert.False(t, found)
 	assert.Equal(t, uint64(0), index)
 
 	err = ledger.Write(
@@ -153,25 +156,38 @@ func TestLedgerIndex(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	index, err = ledger.Index(0)
+	index, found, err = ledger.Index(0)
 	assert.NoError(t, err)
+	assert.True(t, found)
 	assert.Equal(t, uint64(1), index)
 
-	index, err = ledger.Index(2)
+	index, found, err = ledger.Index(2)
 	assert.NoError(t, err)
+	assert.True(t, found)
 	assert.Equal(t, uint64(3), index)
 
-	index, err = ledger.Index(-2)
+	index, found, err = ledger.Index(-2)
 	assert.NoError(t, err)
+	assert.True(t, found)
 	assert.Equal(t, uint64(3), index)
 
-	index, err = ledger.Index(4)
+	index, found, err = ledger.Index(4)
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(0), index)
+	assert.False(t, found)
+	assert.Equal(t, uint64(4), index)
 
-	index, err = ledger.Index(-5)
+	index, found, err = ledger.Index(-5)
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(0), index)
+	assert.False(t, found)
+	assert.Equal(t, uint64(1), index)
+
+	err = ledger.Delete(4)
+	assert.NoError(t, err)
+
+	index, found, err = ledger.Index(1)
+	assert.NoError(t, err)
+	assert.False(t, found)
+	assert.Equal(t, uint64(4), index)
 
 	err = db.Close()
 	assert.NoError(t, err)
