@@ -70,7 +70,7 @@ func (c *Cleaner) worker() error {
 		}
 
 		// get initial position honoring the minimal retention
-		deletePosition, _, err := c.ledger.Index(-(c.config.MinRetention + 1))
+		position, _, err := c.ledger.Index(-(c.config.MinRetention + 1))
 		if err != nil {
 			select {
 			case c.config.Errors <- err:
@@ -99,7 +99,7 @@ func (c *Cleaner) worker() error {
 
 		// honor lowest table positions
 		for _, table := range c.config.Tables {
-			// get lowest position
+			// get lowest position in table
 			lowestPosition, _, err := table.Range()
 			if err != nil {
 				select {
@@ -111,14 +111,14 @@ func (c *Cleaner) worker() error {
 			}
 
 			// set to lowest position if valid
-			if lowestPosition > 0 && deletePosition > lowestPosition {
-				deletePosition = lowestPosition
+			if lowestPosition > 0 && position > lowestPosition {
+				position = lowestPosition
 			}
 		}
 
 		// honor lowest matrix positions
 		for _, matrix := range c.config.Matrices {
-			// get lowest position
+			// get lowest position in matrix
 			lowestPosition, _, err := matrix.Range()
 			if err != nil {
 				select {
@@ -130,20 +130,20 @@ func (c *Cleaner) worker() error {
 			}
 
 			// set to lowest position if valid
-			if lowestPosition > 0 && deletePosition > lowestPosition {
-				deletePosition = lowestPosition
+			if lowestPosition > 0 && position > lowestPosition {
+				position = lowestPosition
 			}
 		}
 
 		// honor max retention if configured
 		if c.config.MaxRetention > 0 {
-			if deletePosition < maxPosition {
-				deletePosition = maxPosition
+			if position < maxPosition {
+				position = maxPosition
 			}
 		}
 
 		// delete entries
-		err = c.ledger.Delete(deletePosition)
+		err = c.ledger.Delete(position)
 		if err != nil {
 			select {
 			case c.config.Errors <- err:
