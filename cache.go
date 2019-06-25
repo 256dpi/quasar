@@ -58,6 +58,27 @@ func (q *Cache) Scan(fn func(int, Entry) bool) {
 	}
 }
 
+// Trim will iterate over the cache entries and remove them until false is
+// returned.
+func (q *Cache) Trim(fn func(Entry) bool) {
+	// acquire mutex
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+
+	// iterate through from tail to head
+	for i := 0; i < q.count; i++ {
+		// return if false
+		if !fn(q.nodes[q.wrap(q.tail+i)]) {
+			return
+		}
+
+		// remove entry
+		q.nodes[q.tail] = Entry{}
+		q.tail = q.wrap(q.tail + 1)
+		q.count--
+	}
+}
+
 // Length will return the length of the cache.
 func (q *Cache) Length() int {
 	// acquire mutex

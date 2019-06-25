@@ -391,6 +391,13 @@ func (l *Ledger) Delete(sequence uint64) error {
 	l.length -= counter
 	l.mutex.Unlock()
 
+	// remove entries from cache
+	if l.cache != nil {
+		l.cache.Trim(func(entry Entry) bool {
+			return entry.Sequence <= sequence
+		})
+	}
+
 	return nil
 }
 

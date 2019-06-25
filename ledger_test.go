@@ -451,6 +451,18 @@ func TestLedgerCache(t *testing.T) {
 		{Sequence: 4, Payload: []byte("qux")},
 	}, entries)
 
+	// cache invalidation
+
+	err = ledger.Delete(2)
+	assert.NoError(t, err)
+
+	entries, err = ledger.Read(2, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, []Entry{
+		{Sequence: 3, Payload: []byte("baz")},
+		{Sequence: 4, Payload: []byte("qux")},
+	}, entries)
+
 	err = db.Close()
 	assert.NoError(t, err)
 }
