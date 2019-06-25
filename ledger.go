@@ -361,6 +361,16 @@ func (l *Ledger) Delete(sequence uint64) error {
 	l.deleteMutex.Lock()
 	defer l.deleteMutex.Unlock()
 
+	// get head
+	l.mutex.Lock()
+	head := l.head
+	l.mutex.Unlock()
+
+	// never delete beyond the current head
+	if sequence > head {
+		sequence = head
+	}
+
 	// compute start and needle
 	start := l.makeEntryKey(0)
 	needle := l.makeEntryKey(sequence)

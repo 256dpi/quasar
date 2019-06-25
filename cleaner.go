@@ -86,7 +86,7 @@ func (c *Cleaner) worker() error {
 			}
 
 			// set to minimal position if valid
-			if minPosition != 0 {
+			if minPosition > 0 {
 				deletePosition = minPosition
 			}
 		}
