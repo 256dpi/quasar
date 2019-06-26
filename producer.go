@@ -14,11 +14,11 @@ type tuple struct {
 
 // ProducerConfig are used to configure a producer.
 type ProducerConfig struct {
-	// The size of the sent entry batches.
-	Batch int
+	// The maximum size of the written entry batches.
+	BatchSize int
 
-	// The timeout after a batch is sent in any case.
-	Timeout time.Duration
+	// The timeout after an unfinished batch is written in any case.
+	BatchTimeout time.Duration
 
 	// The time for which a failed write due to ErrLimitReached is retried.
 	RetryTimeout time.Duration
@@ -44,7 +44,7 @@ func NewProducer(ledger *Ledger, config ProducerConfig) *Producer {
 	p := &Producer{
 		ledger: ledger,
 		config: config,
-		pipe:   make(chan tuple, config.Batch),
+		pipe:   make(chan tuple, config.BatchSize),
 	}
 
 	// run worker
@@ -102,8 +102,8 @@ func (p *Producer) Close() {
 func (p *Producer) worker() error {
 	for {
 		// prepare entries and acks
-		entries := make([]Entry, 0, p.config.Batch)
-		acks := make([]func(error), 0, p.config.Batch)
+		entries := make([]Entry, 0, p.config.BatchSize)
+		acks := make([]func(error), 0, p.config.BatchSize)
 
 		// wait for first tuple
 		select {
@@ -119,7 +119,7 @@ func (p *Producer) worker() error {
 		}
 
 		// prepare timeout
-		tmt := time.After(p.config.Timeout)
+		tmt := time.After(p.config.BatchTimeout)
 
 		// await next tuple or timeout
 		for {
@@ -135,7 +135,7 @@ func (p *Producer) worker() error {
 				acks = append(acks, tpl.ack)
 
 				// continue if there is still space
-				if len(entries) < p.config.Batch {
+				if len(entries) < p.config.BatchSize {
 					continue
 				}
 			case <-tmt:
