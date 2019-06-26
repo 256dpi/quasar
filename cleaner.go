@@ -89,9 +89,14 @@ func (c *Cleaner) clean() error {
 	}
 
 	// get initial position honoring the retention
-	position, _, err := c.ledger.Index(-(c.config.Retention + 1))
+	position, ok, err := c.ledger.Index(-(c.config.Retention + 1))
 	if err != nil {
 		return err
+	}
+
+	// abort clean if initial position has not been found
+	if !ok {
+		return nil
 	}
 
 	// prefetch threshold position. this will make sure that we properly honor
@@ -100,9 +105,14 @@ func (c *Cleaner) clean() error {
 	var threshold uint64
 	if c.config.Threshold > 0 {
 		// get threshold position
-		threshold, _, err = c.ledger.Index(-(c.config.Threshold + 1))
+		threshold, ok, err = c.ledger.Index(-(c.config.Threshold + 1))
 		if err != nil {
 			return err
+		}
+
+		// unset threshold if not found
+		if !ok {
+			threshold = 0
 		}
 	}
 
@@ -134,8 +144,8 @@ func (c *Cleaner) clean() error {
 		}
 	}
 
-	// honor threshold if configured
-	if c.config.Threshold > 0 {
+	// honor threshold if configured and available
+	if c.config.Threshold > 0 && threshold > 0 {
 		if position < threshold {
 			position = threshold
 		}
