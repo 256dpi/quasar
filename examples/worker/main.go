@@ -29,8 +29,8 @@ func producer(ledger *quasar.Ledger, done <-chan struct{}) {
 
 	// create producer
 	producer := quasar.NewProducer(ledger, quasar.ProducerConfig{
-		BatchSize:    batch,
-		BatchTimeout: time.Millisecond,
+		Batch:   batch,
+		Timeout: time.Millisecond,
 	})
 
 	// ensure closing

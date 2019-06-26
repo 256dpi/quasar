@@ -15,16 +15,16 @@ type tuple struct {
 // ProducerConfig are used to configure a producer.
 type ProducerConfig struct {
 	// The maximum size of the written entry batches.
-	BatchSize int
+	Batch int
 
 	// The timeout after an unfinished batch is written in any case.
-	BatchTimeout time.Duration
+	Timeout time.Duration
 
-	// The time for which a failed write due to ErrLimitReached is retried.
-	RetryTimeout time.Duration
+	// The number of times a failed write due to ErrLimitReached is retried.
+	Retry int
 
-	// The interval at which a failed write due to ErrLimitReached is retried.
-	RetryInterval time.Duration
+	// The time after which a failed write due to ErrLimitReached is retried.
+	Delay time.Duration
 }
 
 // Producer provides an interface to efficiently batch entries and write them
@@ -41,12 +41,12 @@ type Producer struct {
 // NewProducer will create and return a producer.
 func NewProducer(ledger *Ledger, config ProducerConfig) *Producer {
 	// set default
-	if config.BatchSize <= 0 {
-		config.BatchSize = 1
+	if config.Batch <= 0 {
+		config.Batch = 1
 	}
 
 	// check interval
-	if config.RetryTimeout > 0 && config.RetryInterval <= 0 {
+	if config.Retry > 0 && config.Delay <= 0 {
 		panic("quasar: missing retry interval")
 	}
 
@@ -54,7 +54,7 @@ func NewProducer(ledger *Ledger, config ProducerConfig) *Producer {
 	p := &Producer{
 		ledger: ledger,
 		config: config,
-		pipe:   make(chan tuple, config.BatchSize),
+		pipe:   make(chan tuple, config.Batch),
 	}
 
 	// run worker
@@ -112,8 +112,8 @@ func (p *Producer) Close() {
 func (p *Producer) worker() error {
 	for {
 		// prepare entries and acks
-		entries := make([]Entry, 0, p.config.BatchSize)
-		acks := make([]func(error), 0, p.config.BatchSize)
+		entries := make([]Entry, 0, p.config.Batch)
+		acks := make([]func(error), 0, p.config.Batch)
 
 		// wait for first tuple
 		select {
@@ -129,7 +129,7 @@ func (p *Producer) worker() error {
 		}
 
 		// prepare timeout
-		tmt := time.After(p.config.BatchTimeout)
+		tmt := time.After(p.config.Timeout)
 
 		// await next tuple or timeout
 		for {
@@ -145,7 +145,7 @@ func (p *Producer) worker() error {
 				acks = append(acks, tpl.ack)
 
 				// continue if there is still space
-				if len(entries) < p.config.BatchSize {
+				if len(entries) < p.config.Batch {
 					continue
 				}
 			case <-tmt:
@@ -159,17 +159,14 @@ func (p *Producer) worker() error {
 		err := p.ledger.Write(entries...)
 
 		// handle retries
-		if err == ErrLimitReached && p.config.RetryTimeout > 0 {
-			// calculate deadline
-			deadline := time.Now().Add(p.config.RetryTimeout)
-
-			// retry as long as limit has been reached
-			for err == ErrLimitReached {
+		if err == ErrLimitReached && p.config.Retry > 0 {
+			// retry the specified number of times
+			for i := 0; i < p.config.Retry; i++ {
 				// wait for next interval or close
 				select {
 				case <-p.tomb.Dying():
 					return tomb.ErrDying
-				case <-time.After(p.config.RetryInterval):
+				case <-time.After(p.config.Delay):
 				}
 
 				// attempt again to write entries
@@ -177,11 +174,6 @@ func (p *Producer) worker() error {
 
 				// break if write succeeded
 				if err == nil {
-					break
-				}
-
-				// break if deadline has been reached
-				if time.Now().After(deadline) {
 					break
 				}
 			}

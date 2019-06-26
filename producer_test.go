@@ -16,8 +16,8 @@ func TestProducer(t *testing.T) {
 	done := make(chan struct{})
 
 	producer := NewProducer(ledger, ProducerConfig{
-		BatchSize:    10,
-		BatchTimeout: time.Millisecond,
+		Batch:   10,
+		Timeout: time.Millisecond,
 	})
 
 	for i := 1; i <= 20; i++ {
@@ -49,10 +49,10 @@ func TestProducerRetry(t *testing.T) {
 	assert.NoError(t, err)
 
 	producer := NewProducer(ledger, ProducerConfig{
-		BatchSize:     3,
-		BatchTimeout:  time.Millisecond,
-		RetryTimeout:  time.Second,
-		RetryInterval: time.Millisecond,
+		Batch:   3,
+		Timeout: time.Millisecond,
+		Retry:   100,
+		Delay:   time.Millisecond,
 	})
 
 	done := make(chan struct{})
@@ -104,8 +104,8 @@ func BenchmarkProducer(b *testing.B) {
 	done := make(chan struct{})
 
 	producer := NewProducer(ledger, ProducerConfig{
-		BatchSize:    100,
-		BatchTimeout: time.Millisecond,
+		Batch:   100,
+		Timeout: time.Millisecond,
 	})
 
 	b.ResetTimer()
