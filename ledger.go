@@ -61,6 +61,11 @@ type Ledger struct {
 // Read, write and delete requested can be issued concurrently to maximize
 // performance. However, only one goroutine may write entries at the same time.
 func CreateLedger(db *DB, config LedgerConfig) (*Ledger, error) {
+	// check prefix
+	if config.Prefix == "" {
+		panic("quasar: missing prefix")
+	}
+
 	// prepare cache
 	var cache *Cache
 	if config.Cache > 0 {

@@ -72,11 +72,11 @@ func worker(ledger *quasar.Ledger, matrix *quasar.Matrix, done <-chan struct{}) 
 	// create worker
 	worker := quasar.NewWorker(ledger, matrix, quasar.WorkerConfig{
 		Name:    "example",
+		Entries: entries,
+		Errors:  errors,
 		Batch:   batch,
 		Window:  batch * 10,
 		Skip:    batch,
-		Entries: entries,
-		Errors:  errors,
 	})
 
 	// ensure closing

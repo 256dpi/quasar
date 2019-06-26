@@ -31,9 +31,9 @@ func TestConsumer(t *testing.T) {
 
 	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
-		Batch:   10,
 		Entries: entries,
 		Errors:  errors,
+		Batch:   10,
 	})
 
 	for {
@@ -58,9 +58,9 @@ func TestConsumer(t *testing.T) {
 
 	consumer = NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
-		Batch:   10,
 		Entries: entries,
 		Errors:  errors,
+		Batch:   10,
 	})
 
 	for {
@@ -104,9 +104,9 @@ func TestConsumerOnDemand(t *testing.T) {
 
 	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
-		Batch:   10,
 		Entries: entries,
 		Errors:  errors,
+		Batch:   10,
 	})
 
 	go func() {
@@ -169,10 +169,10 @@ func TestConsumerSkipping(t *testing.T) {
 
 	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
-		Batch:   10,
-		Skip:    2,
 		Entries: entries,
 		Errors:  errors,
+		Batch:   10,
+		Skip:    2,
 	})
 
 	entry := <-entries
@@ -232,9 +232,9 @@ func TestConsumerUnblock(t *testing.T) {
 
 	reader := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
-		Batch:   1,
 		Entries: entries,
 		Errors:  errors,
+		Batch:   1,
 	})
 
 	err = ledger.Write(Entry{

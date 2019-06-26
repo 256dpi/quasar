@@ -11,17 +11,17 @@ type ConsumerConfig struct {
 	// The name of the consumer.
 	Name string
 
-	// The amount of entries to fetch from the ledger at once.
-	Batch int
-
-	// The number of acks to skip before a new one is written.
-	Skip int
-
 	// The channel on which entries are sent.
 	Entries chan<- Entry
 
 	// The channel on which errors are sent.
 	Errors chan<- error
+
+	// The amount of entries to fetch from the ledger at once.
+	Batch int
+
+	// The number of acks to skip before a new one is written.
+	Skip int
 }
 
 // Consumer manages consuming messages of a ledger using a persistent position.
@@ -39,6 +39,26 @@ type Consumer struct {
 
 // NewConsumer will create and return a new consumer.
 func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer {
+	// check name
+	if config.Name == "" {
+		panic("quasar: missing name")
+	}
+
+	// check entries channel
+	if config.Entries == nil {
+		panic("quasar: missing entries channel")
+	}
+
+	// check errors channel
+	if config.Errors == nil {
+		panic("quasar: missing errors channel")
+	}
+
+	// set default batch
+	if config.Batch <= 0 {
+		config.Batch = 1
+	}
+
 	// prepare consumer
 	c := &Consumer{
 		ledger: ledger,

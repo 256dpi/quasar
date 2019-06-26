@@ -9,14 +9,14 @@ type ReaderConfig struct {
 	// The start position of the reader.
 	Start uint64
 
-	// The amount of entries to fetch from the ledger at once.
-	Batch int
-
 	// The channel on which entries are sent.
 	Entries chan<- Entry
 
 	// The channel on which errors are sent.
 	Errors chan<- error
+
+	// The amount of entries to fetch from the ledger at once.
+	Batch int
 }
 
 // Reader manages consuming messages of a ledger.
@@ -28,6 +28,21 @@ type Reader struct {
 
 // NewReader will create and return a new reader.
 func NewReader(ledger *Ledger, config ReaderConfig) *Reader {
+	// check entries channel
+	if config.Entries == nil {
+		panic("quasar: missing entries channel")
+	}
+
+	// check errors channel
+	if config.Errors == nil {
+		panic("quasar: missing errors channel")
+	}
+
+	// set default batch
+	if config.Batch <= 0 {
+		config.Batch = 1
+	}
+
 	// prepare reader
 	r := &Reader{
 		ledger: ledger,

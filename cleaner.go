@@ -39,6 +39,11 @@ type Cleaner struct {
 
 // NewCleaner will create and return a new cleaner.
 func NewCleaner(ledger *Ledger, config CleanerConfig) *Cleaner {
+	// check interval
+	if config.Interval <= 0 {
+		panic("quasar: missing interval")
+	}
+
 	// prepare consumers
 	c := &Cleaner{
 		ledger: ledger,

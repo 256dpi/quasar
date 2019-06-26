@@ -16,6 +16,12 @@ type WorkerConfig struct {
 	// The name of the worker.
 	Name string
 
+	// The channel on which entries are sent.
+	Entries chan<- Entry
+
+	// The channel on which errors are sent.
+	Errors chan<- error
+
 	// The amount of entries to fetch from the ledger at once.
 	Batch int
 
@@ -24,12 +30,6 @@ type WorkerConfig struct {
 
 	// The number of acks to skip before a new one is written.
 	Skip int
-
-	// The channel on which entries are sent.
-	Entries chan<- Entry
-
-	// The channel on which errors are sent.
-	Errors chan<- error
 }
 
 // Worker manages consuming messages of a ledger using a sequence map.
@@ -43,6 +43,31 @@ type Worker struct {
 
 // NewWorker will create and return a new worker.
 func NewWorker(ledger *Ledger, matrix *Matrix, config WorkerConfig) *Worker {
+	// check name
+	if config.Name == "" {
+		panic("quasar: missing name")
+	}
+
+	// check entries channel
+	if config.Entries == nil {
+		panic("quasar: missing entries channel")
+	}
+
+	// check errors channel
+	if config.Errors == nil {
+		panic("quasar: missing errors channel")
+	}
+
+	// set default batch
+	if config.Batch <= 0 {
+		config.Batch = 1
+	}
+
+	// check window
+	if config.Window <= config.Batch {
+		panic("quasar: window smaller than batch")
+	}
+
 	// prepare workers
 	c := &Worker{
 		ledger: ledger,

@@ -19,6 +19,11 @@ type Matrix struct {
 
 // CreateMatrix will create a matrix that stores positions in the provided db.
 func CreateMatrix(db *DB, config MatrixConfig) (*Matrix, error) {
+	// check prefix
+	if config.Prefix == "" {
+		panic("quasar: missing prefix")
+	}
+
 	// create matrix
 	t := &Matrix{
 		db:     db,

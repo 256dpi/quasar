@@ -19,6 +19,11 @@ type Table struct {
 
 // CreateTable will create a table that stores positions in the provided db.
 func CreateTable(db *DB, config TableConfig) (*Table, error) {
+	// check prefix
+	if config.Prefix == "" {
+		panic("quasar: missing prefix")
+	}
+
 	// create table
 	t := &Table{
 		db:     db,

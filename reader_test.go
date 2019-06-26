@@ -26,9 +26,9 @@ func TestReader(t *testing.T) {
 
 	reader := NewReader(ledger, ReaderConfig{
 		Start:   0,
-		Batch:   10,
 		Entries: entries,
 		Errors:  errors,
+		Batch:   10,
 	})
 
 	var next uint64
@@ -54,9 +54,9 @@ func TestReader(t *testing.T) {
 
 	reader = NewReader(ledger, ReaderConfig{
 		Start:   next,
-		Batch:   10,
 		Entries: entries,
 		Errors:  errors,
+		Batch:   10,
 	})
 
 	for {
@@ -95,9 +95,9 @@ func TestReaderUnblock(t *testing.T) {
 
 	reader := NewReader(ledger, ReaderConfig{
 		Start:   ledger.Head() + 1,
-		Batch:   1,
 		Entries: entries,
 		Errors:  errors,
+		Batch:   1,
 	})
 
 	err = ledger.Write(Entry{

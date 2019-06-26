@@ -40,6 +40,16 @@ type Producer struct {
 
 // NewProducer will create and return a producer.
 func NewProducer(ledger *Ledger, config ProducerConfig) *Producer {
+	// set default
+	if config.BatchSize <= 0 {
+		config.BatchSize = 1
+	}
+
+	// check interval
+	if config.RetryTimeout > 0 && config.RetryInterval <= 0 {
+		panic("quasar: missing retry interval")
+	}
+
 	// prepare producer
 	p := &Producer{
 		ledger: ledger,

@@ -31,10 +31,10 @@ func TestWorker(t *testing.T) {
 
 	worker := NewWorker(ledger, matrix, WorkerConfig{
 		Name:    "foo",
-		Batch:   5,
-		Window:  10,
 		Entries: entries,
 		Errors:  errors,
+		Batch:   5,
+		Window:  10,
 	})
 
 	for {
@@ -60,10 +60,10 @@ func TestWorker(t *testing.T) {
 
 	worker = NewWorker(ledger, matrix, WorkerConfig{
 		Name:    "foo",
-		Batch:   5,
-		Window:  10,
 		Entries: entries,
 		Errors:  errors,
+		Batch:   5,
+		Window:  10,
 	})
 
 	for {
@@ -116,10 +116,10 @@ func TestWorkerRandom(t *testing.T) {
 
 	worker := NewWorker(ledger, matrix, WorkerConfig{
 		Name:    "foo",
-		Batch:   5,
-		Window:  10,
 		Entries: entries,
 		Errors:  errors,
+		Batch:   5,
+		Window:  10,
 	})
 
 	for i := 0; i < 5; i++ {
@@ -176,10 +176,10 @@ func TestWorkerOnDemand(t *testing.T) {
 
 	worker := NewWorker(ledger, matrix, WorkerConfig{
 		Name:    "foo",
-		Batch:   5,
-		Window:  10,
 		Entries: entries,
 		Errors:  errors,
+		Batch:   5,
+		Window:  10,
 	})
 
 	go func() {
@@ -245,11 +245,11 @@ func TestWorkerSkipping(t *testing.T) {
 
 	worker := NewWorker(ledger, matrix, WorkerConfig{
 		Name:    "foo",
+		Entries: entries,
+		Errors:  errors,
 		Batch:   5,
 		Window:  10,
 		Skip:    2,
-		Entries: entries,
-		Errors:  errors,
 	})
 
 	entry := <-entries
@@ -309,10 +309,10 @@ func TestWorkerUnblock(t *testing.T) {
 
 	reader := NewWorker(ledger, matrix, WorkerConfig{
 		Name:    "foo",
-		Batch:   1,
-		Window:  10,
 		Entries: entries,
 		Errors:  errors,
+		Batch:   1,
+		Window:  10,
 	})
 
 	err = ledger.Write(Entry{
@@ -345,10 +345,10 @@ func TestWorkerInvalidSequence(t *testing.T) {
 
 	reader := NewWorker(ledger, matrix, WorkerConfig{
 		Name:    "foo",
-		Batch:   1,
-		Window:  10,
 		Entries: make(chan Entry, 1),
 		Errors:  errors,
+		Batch:   1,
+		Window:  10,
 	})
 
 	err = ledger.Write(Entry{

@@ -17,25 +17,30 @@ type DBConfig struct {
 	// The interval of the garbage collector.
 	GCInterval time.Duration
 
-	// The channel on which errors are sent.
-	Errors chan<- error
+	// The channel on which garbage collector errors are sent.
+	GCErrors chan<- error
 
 	// The sink used for logging.
 	LogSink io.Writer
 }
 
 // OpenDB will open or create the specified db.
-func OpenDB(dir string, config DBConfig) (*DB, error) {
+func OpenDB(directory string, config DBConfig) (*DB, error) {
+	// check directory
+	if directory == "" {
+		panic("quasar: missing directory")
+	}
+
 	// ensure directory
-	err := os.MkdirAll(dir, 0777)
+	err := os.MkdirAll(directory, 0777)
 	if err != nil {
 		return nil, err
 	}
 
 	// prepare options
 	bo := badger.DefaultOptions
-	bo.Dir = dir
-	bo.ValueDir = dir
+	bo.Dir = directory
+	bo.ValueDir = directory
 	bo.Logger = nil
 
 	// set logger if available
@@ -60,9 +65,9 @@ func OpenDB(dir string, config DBConfig) (*DB, error) {
 				err = db.RunValueLogGC(0.5)
 				if err == badger.ErrRejected {
 					return
-				} else if err != nil && err != badger.ErrNoRewrite {
+				} else if err != nil && err != badger.ErrNoRewrite && config.GCErrors != nil {
 					select {
-					case config.Errors <- err:
+					case config.GCErrors <- err:
 					default:
 					}
 				}
