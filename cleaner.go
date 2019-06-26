@@ -8,11 +8,11 @@ import (
 
 // CleanerConfig are used to configure a cleaner.
 type CleanerConfig struct {
-	// The minimal amount of entries to keep.
-	MinRetention int
+	// The point to which entries are kept in any case.
+	Retention int
 
-	// The maximal amount of entries to keep.
-	MaxRetention int
+	// The point after which entries are dropped no matter what.
+	Threshold int
 
 	// The interval of cleanings.
 	Interval time.Duration
@@ -78,24 +78,24 @@ func (c *Cleaner) worker() error {
 }
 
 func (c *Cleaner) clean() error {
-	// skip if ledger if empty or smaller than the minimal retention
-	if c.ledger.Length() <= c.config.MinRetention {
+	// skip if ledger if empty or smaller than the retention
+	if c.ledger.Length() <= c.config.Retention {
 		return nil
 	}
 
-	// get initial position honoring the minimal retention
-	position, _, err := c.ledger.Index(-(c.config.MinRetention + 1))
+	// get initial position honoring the retention
+	position, _, err := c.ledger.Index(-(c.config.Retention + 1))
 	if err != nil {
 		return err
 	}
 
-	// prefetch max retention position. this will make sure that we properly
-	// honor the low positions of tables and matrices if a lot of entries are
-	// written in between
-	var maxPosition uint64
-	if c.config.MaxRetention > 0 {
-		// get maximal retention position
-		maxPosition, _, err = c.ledger.Index(-(c.config.MaxRetention + 1))
+	// prefetch threshold position. this will make sure that we properly honor
+	// the low positions of tables and matrices if a lot of entries are written
+	// during the cleaning
+	var threshold uint64
+	if c.config.Threshold > 0 {
+		// get threshold position
+		threshold, _, err = c.ledger.Index(-(c.config.Threshold + 1))
 		if err != nil {
 			return err
 		}
@@ -104,35 +104,35 @@ func (c *Cleaner) clean() error {
 	// honor lowest table positions
 	for _, table := range c.config.Tables {
 		// get lowest position in table
-		lowestPosition, _, err := table.Range()
+		tablePosition, _, err := table.Range()
 		if err != nil {
 			return err
 		}
 
 		// set to lowest position if valid
-		if lowestPosition > 0 && position > lowestPosition {
-			position = lowestPosition
+		if tablePosition > 0 && position > tablePosition {
+			position = tablePosition
 		}
 	}
 
 	// honor lowest matrix positions
 	for _, matrix := range c.config.Matrices {
 		// get lowest position in matrix
-		lowestPosition, _, err := matrix.Range()
+		matrixPosition, _, err := matrix.Range()
 		if err != nil {
 			return err
 		}
 
 		// set to lowest position if valid
-		if lowestPosition > 0 && position > lowestPosition {
-			position = lowestPosition
+		if matrixPosition > 0 && position > matrixPosition {
+			position = matrixPosition
 		}
 	}
 
-	// honor max retention if configured
-	if c.config.MaxRetention > 0 {
-		if position < maxPosition {
-			position = maxPosition
+	// honor threshold if configured
+	if c.config.Threshold > 0 {
+		if position < threshold {
+			position = threshold
 		}
 	}
 

@@ -165,11 +165,11 @@ func cleaner(ledger *quasar.Ledger, matrix *quasar.Matrix, done <-chan struct{})
 
 	// create cleaner
 	cleaner := quasar.NewCleaner(ledger, quasar.CleanerConfig{
-		MinRetention: 10000,
-		MaxRetention: 100000,
-		Matrices:     []*quasar.Matrix{matrix},
-		Interval:     100 * time.Millisecond,
-		Errors:       errors,
+		Retention: 10000,
+		Threshold: 100000,
+		Matrices:  []*quasar.Matrix{matrix},
+		Interval:  100 * time.Millisecond,
+		Errors:    errors,
 	})
 
 	// ensure closing

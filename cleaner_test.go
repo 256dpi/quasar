@@ -50,8 +50,8 @@ func TestCleanerMinRetention(t *testing.T) {
 	}
 
 	cleaner := NewCleaner(ledger, CleanerConfig{
-		MinRetention: 5,
-		Interval:     10 * time.Millisecond,
+		Retention: 5,
+		Interval:  10 * time.Millisecond,
 	})
 
 	time.Sleep(15 * time.Millisecond)
@@ -79,9 +79,9 @@ func TestCleanerMaxRetention(t *testing.T) {
 	}
 
 	cleaner := NewCleaner(ledger, CleanerConfig{
-		MinRetention: 10,
-		MaxRetention: 5,
-		Interval:     10 * time.Millisecond,
+		Retention: 10,
+		Threshold: 5,
+		Interval:  10 * time.Millisecond,
 	})
 
 	time.Sleep(15 * time.Millisecond)
@@ -115,10 +115,10 @@ func TestCleanerTablePosition(t *testing.T) {
 	assert.NoError(t, err)
 
 	cleaner := NewCleaner(ledger, CleanerConfig{
-		MinRetention: 5,
-		MaxRetention: 15,
-		Tables:       []*Table{table},
-		Interval:     10 * time.Millisecond,
+		Retention: 5,
+		Threshold: 15,
+		Tables:    []*Table{table},
+		Interval:  10 * time.Millisecond,
 	})
 
 	time.Sleep(15 * time.Millisecond)
@@ -152,10 +152,10 @@ func TestCleanerMatrixPosition(t *testing.T) {
 	assert.NoError(t, err)
 
 	cleaner := NewCleaner(ledger, CleanerConfig{
-		MinRetention: 5,
-		MaxRetention: 15,
-		Matrices:     []*Matrix{matrix},
-		Interval:     10 * time.Millisecond,
+		Retention: 5,
+		Threshold: 15,
+		Matrices:  []*Matrix{matrix},
+		Interval:  10 * time.Millisecond,
 	})
 
 	time.Sleep(15 * time.Millisecond)
