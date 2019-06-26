@@ -19,6 +19,12 @@ type ProducerConfig struct {
 
 	// The timeout after a batch is sent in any case.
 	Timeout time.Duration
+
+	// The time for which a failed write due to ErrLimitReached is retried.
+	RetryTimeout time.Duration
+
+	// The interval at which a failed write due to ErrLimitReached is retried.
+	RetryInterval time.Duration
 }
 
 // Producer provides an interface to efficiently batch entries and write them
@@ -141,6 +147,35 @@ func (p *Producer) worker() error {
 
 		// write entries
 		err := p.ledger.Write(entries...)
+
+		// handle retries
+		if err == ErrLimitReached && p.config.RetryTimeout > 0 {
+			// calculate deadline
+			deadline := time.Now().Add(p.config.RetryTimeout)
+
+			// retry as long as limit has been reached
+			for err == ErrLimitReached {
+				// wait for next interval or close
+				select {
+				case <-p.tomb.Dying():
+					return tomb.ErrDying
+				case <-time.After(p.config.RetryInterval):
+				}
+
+				// attempt again to write entries
+				err = p.ledger.Write(entries...)
+
+				// break if write succeeded
+				if err == nil {
+					break
+				}
+
+				// break if deadline has been reached
+				if time.Now().After(deadline) {
+					break
+				}
+			}
+		}
 
 		// call acks
 		for _, ack := range acks {

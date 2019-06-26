@@ -42,6 +42,57 @@ func TestProducer(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestProducerRetry(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Limit: 10})
+	assert.NoError(t, err)
+
+	producer := NewProducer(ledger, ProducerConfig{
+		Batch:         3,
+		Timeout:       time.Millisecond,
+		RetryTimeout:  time.Second,
+		RetryInterval: time.Millisecond,
+	})
+
+	done := make(chan struct{})
+	errors := make(chan error, 21)
+
+	go func() {
+		for {
+			select {
+			default:
+				_ = ledger.Delete(20)
+				time.Sleep(10 * time.Millisecond)
+			case <-done:
+				return
+			}
+		}
+	}()
+
+	for i := 1; i <= 20; i++ {
+		producer.Write(Entry{Sequence: uint64(i), Payload: []byte("foo")}, func(err error) {
+			errors <- err
+
+			if len(errors) >= 20 {
+				close(done)
+			}
+		})
+	}
+
+	<-done
+	close(errors)
+
+	for err := range errors {
+		assert.NoError(t, err)
+	}
+
+	producer.Close()
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func BenchmarkProducer(b *testing.B) {
 	db := openDB(true)
 
