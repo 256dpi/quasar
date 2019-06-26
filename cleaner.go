@@ -27,7 +27,9 @@ type CleanerConfig struct {
 	Errors chan<- error
 }
 
-// Cleaner will delete entries from a ledger using different strategies.
+// Cleaner will periodically delete entries from a ledger honoring min and max
+// retentions and positions from tables and matrices. Failed cleanings are retried
+// and the errors are sent on the supplied channel.
 type Cleaner struct {
 	ledger *Ledger
 	config CleanerConfig
@@ -64,93 +66,81 @@ func (c *Cleaner) worker() error {
 			return tomb.ErrDying
 		}
 
-		// skip if ledger is empty or smaller than the minimal retention
-		if c.ledger.Length() <= c.config.MinRetention {
-			continue
-		}
-
-		// get initial position honoring the minimal retention
-		position, _, err := c.ledger.Index(-(c.config.MinRetention + 1))
-		if err != nil {
+		// perform clean
+		err := c.clean()
+		if err != nil && c.config.Errors != nil {
 			select {
 			case c.config.Errors <- err:
 			default:
 			}
-
-			return err
 		}
+	}
+}
 
-		// prefetch max retention position. this will make sure that we properly
-		// honor the low positions of tables and matrices if a lot of entries are
-		// written in between
-		var maxPosition uint64
-		if c.config.MaxRetention > 0 {
-			// get maximal retention position
-			maxPosition, _, err = c.ledger.Index(-(c.config.MaxRetention + 1))
-			if err != nil {
-				select {
-				case c.config.Errors <- err:
-				default:
-				}
+func (c *Cleaner) clean() error {
+	// skip if ledger if empty or smaller than the minimal retention
+	if c.ledger.Length() <= c.config.MinRetention {
+		return nil
+	}
 
-				return err
-			}
-		}
+	// get initial position honoring the minimal retention
+	position, _, err := c.ledger.Index(-(c.config.MinRetention + 1))
+	if err != nil {
+		return err
+	}
 
-		// honor lowest table positions
-		for _, table := range c.config.Tables {
-			// get lowest position in table
-			lowestPosition, _, err := table.Range()
-			if err != nil {
-				select {
-				case c.config.Errors <- err:
-				default:
-				}
-
-				return err
-			}
-
-			// set to lowest position if valid
-			if lowestPosition > 0 && position > lowestPosition {
-				position = lowestPosition
-			}
-		}
-
-		// honor lowest matrix positions
-		for _, matrix := range c.config.Matrices {
-			// get lowest position in matrix
-			lowestPosition, _, err := matrix.Range()
-			if err != nil {
-				select {
-				case c.config.Errors <- err:
-				default:
-				}
-
-				return err
-			}
-
-			// set to lowest position if valid
-			if lowestPosition > 0 && position > lowestPosition {
-				position = lowestPosition
-			}
-		}
-
-		// honor max retention if configured
-		if c.config.MaxRetention > 0 {
-			if position < maxPosition {
-				position = maxPosition
-			}
-		}
-
-		// delete entries
-		err = c.ledger.Delete(position)
+	// prefetch max retention position. this will make sure that we properly
+	// honor the low positions of tables and matrices if a lot of entries are
+	// written in between
+	var maxPosition uint64
+	if c.config.MaxRetention > 0 {
+		// get maximal retention position
+		maxPosition, _, err = c.ledger.Index(-(c.config.MaxRetention + 1))
 		if err != nil {
-			select {
-			case c.config.Errors <- err:
-			default:
-			}
-
 			return err
 		}
 	}
+
+	// honor lowest table positions
+	for _, table := range c.config.Tables {
+		// get lowest position in table
+		lowestPosition, _, err := table.Range()
+		if err != nil {
+			return err
+		}
+
+		// set to lowest position if valid
+		if lowestPosition > 0 && position > lowestPosition {
+			position = lowestPosition
+		}
+	}
+
+	// honor lowest matrix positions
+	for _, matrix := range c.config.Matrices {
+		// get lowest position in matrix
+		lowestPosition, _, err := matrix.Range()
+		if err != nil {
+			return err
+		}
+
+		// set to lowest position if valid
+		if lowestPosition > 0 && position > lowestPosition {
+			position = lowestPosition
+		}
+	}
+
+	// honor max retention if configured
+	if c.config.MaxRetention > 0 {
+		if position < maxPosition {
+			position = maxPosition
+		}
+	}
+
+	// delete entries
+	err = c.ledger.Delete(position)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
