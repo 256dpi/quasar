@@ -483,6 +483,47 @@ func TestLedgerCache(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestLedgerLimit(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Limit: 3})
+	assert.NoError(t, err)
+	assert.NotNil(t, ledger)
+
+	err = ledger.Write(
+		Entry{Sequence: 1, Payload: []byte("bar")},
+		Entry{Sequence: 2, Payload: []byte("baz")},
+		Entry{Sequence: 3, Payload: []byte("qux")},
+		Entry{Sequence: 4, Payload: []byte("qux")},
+	)
+	assert.Equal(t, ErrLimitReached, err)
+
+	err = ledger.Write(
+		Entry{Sequence: 1, Payload: []byte("bar")},
+		Entry{Sequence: 2, Payload: []byte("baz")},
+	)
+	assert.NoError(t, err)
+
+	err = ledger.Write(
+		Entry{Sequence: 3, Payload: []byte("qux")},
+		Entry{Sequence: 4, Payload: []byte("qux")},
+	)
+	assert.Equal(t, ErrLimitReached, err)
+
+	err = ledger.Write(
+		Entry{Sequence: 3, Payload: []byte("bar")},
+	)
+	assert.NoError(t, err)
+
+	err = ledger.Write(
+		Entry{Sequence: 4, Payload: []byte("qux")},
+	)
+	assert.Equal(t, ErrLimitReached, err)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func BenchmarkLedgerWrite(b *testing.B) {
 	db := openDB(true)
 

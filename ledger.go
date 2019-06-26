@@ -13,6 +13,10 @@ import (
 // ErrNotMonotonic is returned for write attempts that are not monotonic.
 var ErrNotMonotonic = errors.New("not monotonic")
 
+// ErrLimitReached is returned for write attempts that go beyond the allowed
+// ledger length.
+var ErrLimitReached = errors.New("limit reached")
+
 // Entry is a single entry in the ledger.
 type Entry struct {
 	// The entries sequence (must be greater than zero).
@@ -29,6 +33,10 @@ type LedgerConfig struct {
 
 	// The amount of entries to cache in memory.
 	Cache int
+
+	// The maximum length of the ledger. Write() will return ErrLimitReached if
+	// the ledger is longer than this value.
+	Limit int
 }
 
 // Ledger manages the storage of sequential entries.
@@ -153,7 +161,13 @@ func (l *Ledger) Write(entries ...Entry) error {
 	// get head
 	l.mutex.Lock()
 	head := l.head
+	length := l.length
 	l.mutex.Unlock()
+
+	// check length
+	if l.config.Limit > 0 && length+len(entries) > l.config.Limit {
+		return ErrLimitReached
+	}
 
 	// check and update head
 	for _, entry := range entries {
