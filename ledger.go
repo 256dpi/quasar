@@ -312,7 +312,7 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 // Index will return the sequence of the specified index in the ledger. Negative
 // indexes are counted backwards from the head. If the index exceeds the current
 // length, the sequence of the last entry and false is returned. If the ledger
-// is empty the current head or if fresh zero and false will be returned.
+// is empty the current head (zero if unused) and false will be returned.
 func (l *Ledger) Index(index int) (uint64, bool, error) {
 	// compute direction
 	backward := index < 0
