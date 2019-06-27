@@ -158,8 +158,9 @@ func (c *Consumer) worker() error {
 	// prepare stored markers
 	storedMarkers := map[uint64]bool{}
 
-	// fetch stored sequences
+	// check if persistent
 	if c.table != nil {
+		// fetch stored sequences
 		storedSequences, err := c.table.Get(c.config.Name)
 		if err != nil {
 			select {
@@ -178,6 +179,14 @@ func (c *Consumer) worker() error {
 		// set stored markers
 		for _, seq := range storedSequences {
 			storedMarkers[seq] = true
+		}
+
+		// store initial start sequence in table
+		if storedSequences == nil {
+			err := c.table.Set(c.config.Name, []uint64{c.start})
+			if err != nil {
+				return err
+			}
 		}
 	}
 

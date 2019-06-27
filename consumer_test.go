@@ -414,7 +414,7 @@ func TestConsumerAckSkipping(t *testing.T) {
 
 	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
-	assert.Equal(t, []uint64(nil), sequences)
+	assert.Equal(t, []uint64{0}, sequences)
 
 	entry = <-entries
 	consumer.Ack(entry.Sequence)
@@ -423,7 +423,7 @@ func TestConsumerAckSkipping(t *testing.T) {
 
 	sequences, err = table.Get("foo")
 	assert.NoError(t, err)
-	assert.Equal(t, []uint64(nil), sequences)
+	assert.Equal(t, []uint64{0}, sequences)
 
 	entry = <-entries
 	consumer.Ack(entry.Sequence)
