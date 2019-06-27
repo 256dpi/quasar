@@ -127,6 +127,32 @@ func TestLedger(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestLedgerDeleteOutOfRange(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	assert.NoError(t, err)
+	assert.NotNil(t, ledger)
+
+	err = ledger.Write(
+		Entry{Sequence: 2, Payload: []byte("foo")},
+		Entry{Sequence: 3, Payload: []byte("bar")},
+		Entry{Sequence: 4, Payload: []byte("baz")},
+		Entry{Sequence: 5, Payload: []byte("qux")},
+	)
+	assert.NoError(t, err)
+
+	n, err := ledger.Delete(1)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, n)
+
+	length := ledger.Length()
+	assert.Equal(t, 4, length)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func TestLedgerIndex(t *testing.T) {
 	db := openDB(true)
 

@@ -470,6 +470,11 @@ func (l *Ledger) partialDelete(sequence uint64) (uint64, int, bool, error) {
 
 		// delete all entries
 		for iter.Seek(l.makeEntryKey(0)); iter.Valid(); iter.Next() {
+			// stop if key is after needle
+			if bytes.Compare(iter.Item().Key(), needle) > 0 {
+				break
+			}
+
 			// copy key
 			key := iter.Item().KeyCopy(nil)
 
@@ -484,11 +489,6 @@ func (l *Ledger) partialDelete(sequence uint64) (uint64, int, bool, error) {
 
 			// increment counter
 			counter++
-
-			// stop if current key is needle
-			if bytes.Equal(key, needle) {
-				break
-			}
 
 			// stop if transaction is exhausted
 			if counter >= int(l.db.MaxBatchCount()-10) {
