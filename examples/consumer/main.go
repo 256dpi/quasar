@@ -64,15 +64,15 @@ func producer(ledger *quasar.Ledger, done <-chan struct{}) {
 	}
 }
 
-func worker(ledger *quasar.Ledger, matrix *quasar.Matrix, done <-chan struct{}) {
+func consumer(ledger *quasar.Ledger, matrix *quasar.Matrix, done <-chan struct{}) {
 	defer wg.Done()
 
 	// prepare channels
 	entries := make(chan quasar.Entry, batch)
 	errors := make(chan error, 1)
 
-	// create worker
-	worker := quasar.NewWorker(ledger, matrix, quasar.WorkerConfig{
+	// create consumer
+	consumer := quasar.NewConsumer(ledger, matrix, quasar.ConsumerConfig{
 		Name:    "example",
 		Entries: entries,
 		Errors:  errors,
@@ -82,7 +82,7 @@ func worker(ledger *quasar.Ledger, matrix *quasar.Matrix, done <-chan struct{}) 
 	})
 
 	// ensure closing
-	defer worker.Close()
+	defer consumer.Close()
 
 	for {
 		// prepare entry
@@ -110,7 +110,7 @@ func worker(ledger *quasar.Ledger, matrix *quasar.Matrix, done <-chan struct{}) 
 		mutex.Unlock()
 
 		// acknowledge
-		worker.Ack(entry.Sequence)
+		consumer.Ack(entry.Sequence)
 	}
 }
 
@@ -231,7 +231,7 @@ func main() {
 	// run routines
 	wg.Add(4)
 	go producer(ledger, done)
-	go worker(ledger, matrix, done)
+	go consumer(ledger, matrix, done)
 	go cleaner(ledger, matrix, done)
 	go printer(ledger, done)
 

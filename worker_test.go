@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestWorker(t *testing.T) {
+func TestConsumer(t *testing.T) {
 	db := openDB(true)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
@@ -29,7 +29,7 @@ func TestWorker(t *testing.T) {
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	worker := NewWorker(ledger, matrix, WorkerConfig{
+	consumer := NewConsumer(ledger, matrix, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -44,7 +44,7 @@ func TestWorker(t *testing.T) {
 		assert.Equal(t, uint64(counter), entry.Sequence)
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
-		worker.Ack(entry.Sequence)
+		consumer.Ack(entry.Sequence)
 
 		if counter == 50 {
 			break
@@ -53,12 +53,12 @@ func TestWorker(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	worker.Close()
+	consumer.Close()
 	assert.Empty(t, errors)
 
 	entries = make(chan Entry, 10)
 
-	worker = NewWorker(ledger, matrix, WorkerConfig{
+	consumer = NewConsumer(ledger, matrix, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -73,7 +73,7 @@ func TestWorker(t *testing.T) {
 		assert.Equal(t, uint64(counter), entry.Sequence, counter)
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
-		worker.Ack(entry.Sequence)
+		consumer.Ack(entry.Sequence)
 
 		if counter == 100 {
 			break
@@ -82,7 +82,7 @@ func TestWorker(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	worker.Close()
+	consumer.Close()
 	assert.Empty(t, errors)
 
 	sequences, err := matrix.Get("foo")
@@ -93,7 +93,7 @@ func TestWorker(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestWorkerSingular(t *testing.T) {
+func TestConsumerSingular(t *testing.T) {
 	db := openDB(true)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
@@ -114,7 +114,7 @@ func TestWorkerSingular(t *testing.T) {
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	worker := NewWorker(ledger, matrix, WorkerConfig{
+	consumer := NewConsumer(ledger, matrix, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -129,7 +129,7 @@ func TestWorkerSingular(t *testing.T) {
 		assert.Equal(t, uint64(counter), entry.Sequence)
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
-		worker.Ack(entry.Sequence)
+		consumer.Ack(entry.Sequence)
 
 		if counter == 50 {
 			break
@@ -138,12 +138,12 @@ func TestWorkerSingular(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	worker.Close()
+	consumer.Close()
 	assert.Empty(t, errors)
 
 	entries = make(chan Entry, 10)
 
-	worker = NewWorker(ledger, matrix, WorkerConfig{
+	consumer = NewConsumer(ledger, matrix, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -158,7 +158,7 @@ func TestWorkerSingular(t *testing.T) {
 		assert.Equal(t, uint64(counter), entry.Sequence, counter)
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
-		worker.Ack(entry.Sequence)
+		consumer.Ack(entry.Sequence)
 
 		if counter == 100 {
 			break
@@ -167,7 +167,7 @@ func TestWorkerSingular(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	worker.Close()
+	consumer.Close()
 	assert.Empty(t, errors)
 
 	sequences, err := matrix.Get("foo")
@@ -178,7 +178,7 @@ func TestWorkerSingular(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestWorkerRandom(t *testing.T) {
+func TestConsumerRandom(t *testing.T) {
 	db := openDB(true)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
@@ -199,7 +199,7 @@ func TestWorkerRandom(t *testing.T) {
 	errors := make(chan error, 1)
 	signal := make(chan struct{}, 100)
 
-	worker := NewWorker(ledger, matrix, WorkerConfig{
+	consumer := NewConsumer(ledger, matrix, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -217,7 +217,7 @@ func TestWorkerRandom(t *testing.T) {
 
 				time.Sleep(time.Duration(rand.Intn(10000)) * time.Microsecond)
 
-				worker.Ack(entry.Sequence)
+				consumer.Ack(entry.Sequence)
 				signal <- struct{}{}
 			}
 		}()
@@ -236,7 +236,7 @@ func TestWorkerRandom(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	worker.Close()
+	consumer.Close()
 	assert.Empty(t, errors)
 
 	sequences, err := matrix.Get("foo")
@@ -247,7 +247,7 @@ func TestWorkerRandom(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestWorkerOnDemand(t *testing.T) {
+func TestConsumerOnDemand(t *testing.T) {
 	db := openDB(true)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
@@ -259,7 +259,7 @@ func TestWorkerOnDemand(t *testing.T) {
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	worker := NewWorker(ledger, matrix, WorkerConfig{
+	consumer := NewConsumer(ledger, matrix, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -288,7 +288,7 @@ func TestWorkerOnDemand(t *testing.T) {
 		assert.Equal(t, uint64(counter), entry.Sequence)
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
-		worker.Ack(entry.Sequence)
+		consumer.Ack(entry.Sequence)
 
 		if counter == 100 {
 			break
@@ -297,7 +297,7 @@ func TestWorkerOnDemand(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	worker.Close()
+	consumer.Close()
 	assert.Empty(t, errors)
 
 	sequences, err := matrix.Get("foo")
@@ -308,7 +308,7 @@ func TestWorkerOnDemand(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestWorkerSkipping(t *testing.T) {
+func TestConsumerSkipping(t *testing.T) {
 	db := openDB(true)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
@@ -328,7 +328,7 @@ func TestWorkerSkipping(t *testing.T) {
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	worker := NewWorker(ledger, matrix, WorkerConfig{
+	consumer := NewConsumer(ledger, matrix, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -338,7 +338,7 @@ func TestWorkerSkipping(t *testing.T) {
 	})
 
 	entry := <-entries
-	worker.Ack(entry.Sequence)
+	consumer.Ack(entry.Sequence)
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -347,7 +347,7 @@ func TestWorkerSkipping(t *testing.T) {
 	assert.Equal(t, []uint64(nil), sequences)
 
 	entry = <-entries
-	worker.Ack(entry.Sequence)
+	consumer.Ack(entry.Sequence)
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -356,7 +356,7 @@ func TestWorkerSkipping(t *testing.T) {
 	assert.Equal(t, []uint64(nil), sequences)
 
 	entry = <-entries
-	worker.Ack(entry.Sequence)
+	consumer.Ack(entry.Sequence)
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -365,11 +365,11 @@ func TestWorkerSkipping(t *testing.T) {
 	assert.Equal(t, []uint64{3}, sequences)
 
 	entry = <-entries
-	worker.Ack(entry.Sequence)
+	consumer.Ack(entry.Sequence)
 
 	time.Sleep(10 * time.Millisecond)
 
-	worker.Close()
+	consumer.Close()
 	assert.Empty(t, errors)
 
 	sequences, err = matrix.Get("foo")
@@ -380,7 +380,7 @@ func TestWorkerSkipping(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestWorkerUnblock(t *testing.T) {
+func TestConsumerUnblock(t *testing.T) {
 	db := openDB(true)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
@@ -401,7 +401,7 @@ func TestWorkerUnblock(t *testing.T) {
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	reader := NewWorker(ledger, matrix, WorkerConfig{
+	consumer := NewConsumer(ledger, matrix, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -419,14 +419,14 @@ func TestWorkerUnblock(t *testing.T) {
 	assert.Equal(t, uint64(2), entry.Sequence)
 	assert.Equal(t, []byte("foo"), entry.Payload)
 
-	reader.Close()
+	consumer.Close()
 	assert.Empty(t, errors)
 
 	err = db.Close()
 	assert.NoError(t, err)
 }
 
-func TestWorkerResumeOutOfRange(t *testing.T) {
+func TestConsumerResumeOutOfRange(t *testing.T) {
 	db := openDB(true)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
@@ -447,7 +447,7 @@ func TestWorkerResumeOutOfRange(t *testing.T) {
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	worker := NewWorker(ledger, matrix, WorkerConfig{
+	consumer := NewConsumer(ledger, matrix, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -461,14 +461,14 @@ func TestWorkerResumeOutOfRange(t *testing.T) {
 		assert.Equal(t, uint64(counter), entry.Sequence)
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
-		worker.Ack(entry.Sequence)
+		consumer.Ack(entry.Sequence)
 
 		if counter == 50 {
 			break
 		}
 	}
 
-	worker.Close()
+	consumer.Close()
 	assert.Empty(t, errors)
 
 	_, err = ledger.Delete(60)
@@ -478,7 +478,7 @@ func TestWorkerResumeOutOfRange(t *testing.T) {
 
 	entries = make(chan Entry, 10)
 
-	worker = NewWorker(ledger, matrix, WorkerConfig{
+	consumer = NewConsumer(ledger, matrix, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -492,14 +492,14 @@ func TestWorkerResumeOutOfRange(t *testing.T) {
 		assert.Equal(t, uint64(counter), entry.Sequence)
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
-		worker.Ack(entry.Sequence)
+		consumer.Ack(entry.Sequence)
 
 		if counter == 90 {
 			break
 		}
 	}
 
-	worker.Close()
+	consumer.Close()
 	assert.Empty(t, errors)
 
 	position, err := matrix.Get("foo")
@@ -510,7 +510,7 @@ func TestWorkerResumeOutOfRange(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestWorkerInvalidSequence(t *testing.T) {
+func TestConsumerInvalidSequence(t *testing.T) {
 	db := openDB(true)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
@@ -521,7 +521,7 @@ func TestWorkerInvalidSequence(t *testing.T) {
 
 	errors := make(chan error, 1)
 
-	reader := NewWorker(ledger, matrix, WorkerConfig{
+	consumer := NewConsumer(ledger, matrix, ConsumerConfig{
 		Name:    "foo",
 		Entries: make(chan Entry, 1),
 		Errors:  errors,
@@ -535,12 +535,12 @@ func TestWorkerInvalidSequence(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	reader.Ack(2)
+	consumer.Ack(2)
 
 	err = <-errors
 	assert.Equal(t, ErrInvalidSequence, err)
 
-	reader.Close()
+	consumer.Close()
 	assert.Empty(t, errors)
 
 	err = db.Close()

@@ -8,12 +8,12 @@ import (
 )
 
 // ErrInvalidSequence is returned if Ack() is called with a sequences that has
-// not yet been processed by the worker.
+// not yet been processed by the consumer.
 var ErrInvalidSequence = errors.New("invalid sequence")
 
-// WorkerConfig are used to configure a worker.
-type WorkerConfig struct {
-	// The name of the worker.
+// ConsumerConfig are used to configure a consumer.
+type ConsumerConfig struct {
+	// The name of the consumer.
 	Name string
 
 	// The channel on which entries are sent.
@@ -32,19 +32,19 @@ type WorkerConfig struct {
 	Skip int
 }
 
-// Worker manages consuming messages of a ledger using a sequence map.
-type Worker struct {
+// Consumer manages consuming messages of a ledger using a sequence map.
+type Consumer struct {
 	ledger *Ledger
 	matrix *Matrix
-	config WorkerConfig
+	config ConsumerConfig
 	start  uint64
 	pipe   chan Entry
 	marks  chan uint64
 	tomb   tomb.Tomb
 }
 
-// NewWorker will create and return a new worker.
-func NewWorker(ledger *Ledger, matrix *Matrix, config WorkerConfig) *Worker {
+// NewConsumer will create and return a new consumer.
+func NewConsumer(ledger *Ledger, matrix *Matrix, config ConsumerConfig) *Consumer {
 	// check name
 	if config.Name == "" {
 		panic("quasar: missing name")
@@ -70,8 +70,8 @@ func NewWorker(ledger *Ledger, matrix *Matrix, config WorkerConfig) *Worker {
 		config.Window = 1
 	}
 
-	// prepare workers
-	c := &Worker{
+	// prepare consumer
+	c := &Consumer{
 		ledger: ledger,
 		matrix: matrix,
 		config: config,
@@ -86,20 +86,20 @@ func NewWorker(ledger *Ledger, matrix *Matrix, config WorkerConfig) *Worker {
 }
 
 // Ack will acknowledge the consumption of the specified sequence.
-func (w *Worker) Ack(sequence uint64) {
+func (w *Consumer) Ack(sequence uint64) {
 	select {
 	case w.marks <- sequence:
 	case <-w.tomb.Dying():
 	}
 }
 
-// Close will close the worker.
-func (w *Worker) Close() {
+// Close will close the consumer.
+func (w *Consumer) Close() {
 	w.tomb.Kill(nil)
 	_ = w.tomb.Wait()
 }
 
-func (w *Worker) reader() error {
+func (w *Consumer) reader() error {
 	// subscribe to notifications
 	notifications := make(chan uint64, 1)
 	w.ledger.Subscribe(notifications)
@@ -148,7 +148,7 @@ func (w *Worker) reader() error {
 	}
 }
 
-func (w *Worker) worker() error {
+func (w *Consumer) worker() error {
 	// fetch stored sequences
 	storedSequences, err := w.matrix.Get(w.config.Name)
 	if err != nil {
