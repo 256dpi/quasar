@@ -169,10 +169,8 @@ func (w *Worker) worker() error {
 
 	for {
 		// check if closed
-		select {
-		case <-w.tomb.Dying():
+		if !w.tomb.Alive() {
 			return tomb.ErrDying
-		default:
 		}
 
 		// check if there is space for another batch

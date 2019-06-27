@@ -153,10 +153,8 @@ func (c *Consumer) worker() error {
 
 	for {
 		// check if closed
-		select {
-		case <-c.tomb.Dying():
+		if !c.tomb.Alive() {
 			return tomb.ErrDying
-		default:
 		}
 
 		// wait for notification if no new data in ledger

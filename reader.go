@@ -72,10 +72,8 @@ func (r *Reader) worker() error {
 
 	for {
 		// check if closed
-		select {
-		case <-r.tomb.Dying():
+		if !r.tomb.Alive() {
 			return tomb.ErrDying
-		default:
 		}
 
 		// wait for notification if no new data in ledger

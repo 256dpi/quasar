@@ -68,10 +68,8 @@ func NewProducer(ledger *Ledger, config ProducerConfig) *Producer {
 // successful.
 func (p *Producer) Write(entry Entry, ack func(error)) bool {
 	// check if closed
-	select {
-	case <-p.tomb.Dying():
+	if !p.tomb.Alive() {
 		return false
-	default:
 	}
 
 	// create tuple
