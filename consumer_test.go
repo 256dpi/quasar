@@ -89,6 +89,92 @@ func TestConsumer(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestConsumerResumeOutOfRange(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	assert.NoError(t, err)
+
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	assert.NoError(t, err)
+
+	for i := 1; i <= 100; i++ {
+		err = ledger.Write(Entry{
+			Sequence: uint64(i),
+			Payload:  []byte("foo"),
+		})
+		assert.NoError(t, err)
+	}
+
+	counter := 0
+	entries := make(chan Entry, 1)
+	errors := make(chan error, 1)
+
+	consumer := NewConsumer(ledger, table, ConsumerConfig{
+		Name:    "foo",
+		Entries: entries,
+		Errors:  errors,
+		Batch:   10,
+	})
+
+	for {
+		counter++
+
+		entry := <-entries
+		assert.Equal(t, uint64(counter), entry.Sequence)
+		assert.Equal(t, []byte("foo"), entry.Payload)
+
+		err = consumer.Ack(entry.Sequence)
+		assert.NoError(t, err)
+
+		if counter == 50 {
+			break
+		}
+	}
+
+	consumer.Close()
+	assert.Empty(t, errors)
+
+	_, err = ledger.Delete(60)
+	assert.NoError(t, err)
+
+	counter += 10
+
+	entries = make(chan Entry, 10)
+
+	consumer = NewConsumer(ledger, table, ConsumerConfig{
+		Name:    "foo",
+		Entries: entries,
+		Errors:  errors,
+		Batch:   10,
+	})
+
+	for {
+		counter++
+
+		entry := <-entries
+		assert.Equal(t, uint64(counter), entry.Sequence)
+		assert.Equal(t, []byte("foo"), entry.Payload)
+
+		err = consumer.Ack(entry.Sequence)
+		assert.NoError(t, err)
+
+		if counter == 90 {
+			break
+		}
+	}
+
+	consumer.Close()
+	assert.Empty(t, errors)
+
+	position, err := table.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(90), position)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func TestConsumerOnDemand(t *testing.T) {
 	db := openDB(true)
 
