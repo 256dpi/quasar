@@ -62,7 +62,7 @@ func TestProducerRetry(t *testing.T) {
 		for {
 			select {
 			default:
-				_ = ledger.Delete(20)
+				_, _ = ledger.Delete(20)
 				time.Sleep(10 * time.Millisecond)
 			case <-done:
 				return

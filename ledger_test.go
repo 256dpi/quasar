@@ -100,8 +100,9 @@ func TestLedger(t *testing.T) {
 
 	// delete
 
-	err = ledger.Delete(3)
+	n, err := ledger.Delete(3)
 	assert.NoError(t, err)
+	assert.Equal(t, 3, n)
 
 	entries, err = ledger.Read(0, 10)
 	assert.NoError(t, err)
@@ -181,8 +182,9 @@ func TestLedgerIndex(t *testing.T) {
 	assert.False(t, found)
 	assert.Equal(t, uint64(1), index)
 
-	err = ledger.Delete(4)
+	n, err := ledger.Delete(4)
 	assert.NoError(t, err)
+	assert.Equal(t, 4, n)
 
 	index, found, err = ledger.Index(1)
 	assert.NoError(t, err)
@@ -411,8 +413,9 @@ func TestLedgerHugeDelete(t *testing.T) {
 	err = ledger.Write(batch[db.MaxBatchCount()-10 : db.MaxBatchCount()+10]...)
 	assert.NoError(t, err)
 
-	err = ledger.Delete(uint64(db.MaxBatchCount() + 10))
+	n, err := ledger.Delete(uint64(db.MaxBatchCount() + 10))
 	assert.NoError(t, err)
+	assert.Equal(t, int(db.MaxBatchCount()+10), n)
 
 	length := ledger.length
 	assert.Equal(t, 0, length)
@@ -469,8 +472,9 @@ func TestLedgerCache(t *testing.T) {
 
 	// cache invalidation
 
-	err = ledger.Delete(2)
+	n, err := ledger.Delete(2)
 	assert.NoError(t, err)
+	assert.Equal(t, 2, n)
 
 	entries, err = ledger.Read(2, 10)
 	assert.NoError(t, err)
@@ -638,7 +642,7 @@ func BenchmarkLedgerDelete(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		err := ledger.Delete(uint64(rand.Int63n(int64(size))))
+		_, err := ledger.Delete(uint64(rand.Int63n(int64(size))))
 		if err != nil {
 			panic(err)
 		}

@@ -152,7 +152,7 @@ func (c *Cleaner) clean() error {
 	}
 
 	// delete entries
-	err = c.ledger.Delete(position)
+	_, err = c.ledger.Delete(position)
 	if err != nil {
 		return err
 	}

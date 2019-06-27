@@ -401,7 +401,7 @@ func (l *Ledger) Index(index int) (uint64, bool, error) {
 
 // Delete will remove all entries up to and including the specified sequence
 // from the ledger.
-func (l *Ledger) Delete(sequence uint64) error {
+func (l *Ledger) Delete(sequence uint64) (int, error) {
 	// acquire mutex
 	l.deleteMutex.Lock()
 	defer l.deleteMutex.Unlock()
@@ -428,7 +428,7 @@ func (l *Ledger) Delete(sequence uint64) error {
 		// perform partial delete
 		end, n, err := l.partialDelete(start, needle)
 		if err != nil {
-			return err
+			return counter, err
 		}
 
 		// increment counter
@@ -455,7 +455,7 @@ func (l *Ledger) Delete(sequence uint64) error {
 		})
 	}
 
-	return nil
+	return counter, nil
 }
 
 func (l *Ledger) partialDelete(start, needle []byte) ([]byte, int, error) {
