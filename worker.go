@@ -241,8 +241,6 @@ func (w *Consumer) worker() error {
 		case dynQueue <- dynEntry:
 			// remove entry from queue
 			buffer = buffer[1:]
-
-			// TODO: Use circular buffer?
 		case sequence := <-w.marks:
 			// check sequence
 			_, ok := markers[sequence]

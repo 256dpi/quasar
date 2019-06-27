@@ -33,8 +33,7 @@ func TestConsumer(t *testing.T) {
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
-		Batch:   5,
-		Window:  10,
+		Batch:   10,
 	})
 
 	for {
@@ -62,8 +61,7 @@ func TestConsumer(t *testing.T) {
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
-		Batch:   5,
-		Window:  10,
+		Batch:   10,
 	})
 
 	for {
@@ -93,7 +91,7 @@ func TestConsumer(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestConsumerSingular(t *testing.T) {
+func TestConsumerWindow(t *testing.T) {
 	db := openDB(true)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
@@ -118,8 +116,8 @@ func TestConsumerSingular(t *testing.T) {
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
-		Batch:   10,
-		Window:  1,
+		Batch:   5,
+		Window:  10,
 	})
 
 	for {
@@ -147,8 +145,8 @@ func TestConsumerSingular(t *testing.T) {
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
-		Batch:   10,
-		Window:  1,
+		Batch:   5,
+		Window:  10,
 	})
 
 	for {
@@ -178,7 +176,7 @@ func TestConsumerSingular(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestConsumerRandom(t *testing.T) {
+func TestConsumerSlowAck(t *testing.T) {
 	db := openDB(true)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
@@ -247,7 +245,7 @@ func TestConsumerRandom(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestConsumerOnDemand(t *testing.T) {
+func TestConsumerSlowLedger(t *testing.T) {
 	db := openDB(true)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
@@ -308,7 +306,7 @@ func TestConsumerOnDemand(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestConsumerSkipping(t *testing.T) {
+func TestConsumerAckSkipping(t *testing.T) {
 	db := openDB(true)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
@@ -471,6 +469,10 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 	consumer.Close()
 	assert.Empty(t, errors)
 
+	position, err := table.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, []uint64{50}, position)
+
 	_, err = ledger.Delete(60)
 	assert.NoError(t, err)
 
@@ -502,7 +504,7 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 	consumer.Close()
 	assert.Empty(t, errors)
 
-	position, err := table.Get("foo")
+	position, err = table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{90}, position)
 
