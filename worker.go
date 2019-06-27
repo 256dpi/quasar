@@ -37,6 +37,8 @@ type Worker struct {
 	ledger *Ledger
 	matrix *Matrix
 	config WorkerConfig
+	start  uint64
+	pipe   chan Entry
 	marks  chan uint64
 	tomb   tomb.Tomb
 }
@@ -63,9 +65,9 @@ func NewWorker(ledger *Ledger, matrix *Matrix, config WorkerConfig) *Worker {
 		config.Batch = 1
 	}
 
-	// check window
-	if config.Window <= config.Batch {
-		panic("quasar: window smaller than batch")
+	// set default window
+	if config.Window <= 0 {
+		config.Window = 1
 	}
 
 	// prepare workers
@@ -73,6 +75,7 @@ func NewWorker(ledger *Ledger, matrix *Matrix, config WorkerConfig) *Worker {
 		ledger: ledger,
 		matrix: matrix,
 		config: config,
+		pipe:   make(chan Entry, config.Batch),
 		marks:  make(chan uint64, config.Window),
 	}
 
@@ -96,14 +99,58 @@ func (w *Worker) Close() {
 	_ = w.tomb.Wait()
 }
 
-func (w *Worker) worker() error {
+func (w *Worker) reader() error {
 	// subscribe to notifications
 	notifications := make(chan uint64, 1)
 	w.ledger.Subscribe(notifications)
 	defer w.ledger.Unsubscribe(notifications)
 
+	// get initial position
+	position := w.start
+
+	for {
+		// check if closed
+		if !w.tomb.Alive() {
+			return tomb.ErrDying
+		}
+
+		// wait for notification if no new data in ledger
+		if w.ledger.Head() < position {
+			select {
+			case <-notifications:
+			case <-w.tomb.Dying():
+				return tomb.ErrDying
+			}
+
+			continue
+		}
+
+		// read entries
+		entries, err := w.ledger.Read(position, w.config.Batch)
+		if err != nil {
+			select {
+			case w.config.Errors <- err:
+			default:
+			}
+
+			return err
+		}
+
+		// put entries on pipe
+		for _, entry := range entries {
+			select {
+			case w.pipe <- entry:
+				position = entry.Sequence + 1
+			case <-w.tomb.Dying():
+				return tomb.ErrDying
+			}
+		}
+	}
+}
+
+func (w *Worker) worker() error {
 	// fetch stored sequences
-	sequences, err := w.matrix.Get(w.config.Name)
+	storedSequences, err := w.matrix.Get(w.config.Name)
 	if err != nil {
 		select {
 		case w.config.Errors <- err:
@@ -113,56 +160,28 @@ func (w *Worker) worker() error {
 		return err
 	}
 
+	// set start to first sequence if available
+	if len(storedSequences) > 0 {
+		w.start = storedSequences[0]
+	}
+
+	// run reader
+	w.tomb.Go(w.reader)
+
+	// compute stored markers
+	storedMarkers := map[uint64]bool{}
+	for _, seq := range storedSequences {
+		storedMarkers[seq] = true
+	}
+
+	// unset stored sequences
+	storedSequences = nil
+
 	// prepare markers
 	markers := map[uint64]bool{}
 
-	// prepare head
-	var head uint64
-
-	// prepare queue
-	var queue []Entry
-
-	// check loaded sequences
-	if len(sequences) > 0 {
-		// set initial head
-		head = sequences[0]
-
-		// apply processed entries
-		for _, seq := range sequences {
-			markers[seq] = true
-		}
-
-		// load all unprocessed entries
-		for {
-			// load a batch of unprocessed entries
-			entries, err := w.ledger.Read(head, w.config.Batch)
-			if err != nil {
-				select {
-				case w.config.Errors <- err:
-				default:
-				}
-
-				return err
-			}
-
-			// add unprocessed entries
-			for _, entry := range entries {
-				// set head
-				head = entry.Sequence
-
-				// add if not already processed
-				if !markers[entry.Sequence] {
-					markers[entry.Sequence] = false
-					queue = append(queue, entry)
-				}
-			}
-
-			// stop if all entries have been loaded
-			if head >= sequences[len(sequences)-1] {
-				break
-			}
-		}
-	}
+	// prepare buffer
+	var buffer []Entry
 
 	// prepare skipped
 	var skipped int
@@ -173,7 +192,7 @@ func (w *Worker) worker() error {
 			// store potentially uncommitted sequences if skip is enabled
 			if w.config.Skip > 0 {
 				// compile markers
-				list := compileMarkers(markers)
+				list := compileAndCompressMarkers(markers)
 
 				// store sequences in matrix
 				err := w.matrix.Set(w.config.Name, list)
@@ -185,25 +204,12 @@ func (w *Worker) worker() error {
 			return tomb.ErrDying
 		}
 
-		// check if there is space for another batch
-		if len(markers) < w.config.Window-w.config.Batch {
-			// load more entries
-			entries, err := w.ledger.Read(head+1, w.config.Batch)
-			if err != nil {
-				select {
-				case w.config.Errors <- err:
-				default:
-				}
+		// prepare dynamic pipe
+		var dynPipe <-chan Entry
 
-				return err
-			}
-
-			// add entries
-			for _, entry := range entries {
-				head = entry.Sequence
-				markers[entry.Sequence] = false
-				queue = append(queue, entry)
-			}
+		// check if window is not full yet and
+		if len(markers) <= w.config.Window {
+			dynPipe = w.pipe
 		}
 
 		// prepare dynamic queue and entry
@@ -211,16 +217,32 @@ func (w *Worker) worker() error {
 		var dynEntry Entry
 
 		// only queue an entry if one is available
-		if len(queue) > 0 {
+		if len(buffer) > 0 {
 			dynQueue = w.config.Entries
-			dynEntry = queue[0]
+			dynEntry = buffer[0]
 		}
 
-		// queue entry, receive mark or receive notification
+		// receive entry, queue entry or receive mark
 		select {
+		case entry := <-dynPipe:
+			// skip already processed entry
+			if ok, _ := markers[entry.Sequence]; ok {
+				continue
+			}
+
+			// skip entry processed in old session
+			if ok, _ := storedMarkers[entry.Sequence]; ok {
+				continue
+			}
+
+			// add entry
+			markers[entry.Sequence] = false
+			buffer = append(buffer, entry)
 		case dynQueue <- dynEntry:
 			// remove entry from queue
-			queue = queue[1:]
+			buffer = buffer[1:]
+
+			// TODO: Use circular buffer?
 		case sequence := <-w.marks:
 			// check sequence
 			_, ok := markers[sequence]
@@ -251,7 +273,7 @@ func (w *Worker) worker() error {
 			}
 
 			// compile markers
-			list := compileMarkers(markers)
+			list := compileAndCompressMarkers(markers)
 
 			// store sequences in matrix
 			err := w.matrix.Set(w.config.Name, list)
@@ -263,13 +285,12 @@ func (w *Worker) worker() error {
 
 				return err
 			}
-		case <-notifications:
 		case <-w.tomb.Dying():
 		}
 	}
 }
 
-func compileMarkers(markers map[uint64]bool) []uint64 {
+func compileAndCompressMarkers(markers map[uint64]bool) []uint64 {
 	// compile list
 	var list []uint64
 	for seq, ok := range markers {
