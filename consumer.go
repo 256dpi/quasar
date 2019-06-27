@@ -16,6 +16,9 @@ type ConsumerConfig struct {
 	// The name of the consumer.
 	Name string
 
+	// The start position of the consumer if not recovered from the table.
+	Start uint64
+
 	// The channel on which entries are sent.
 	Entries chan<- Entry
 
@@ -46,7 +49,7 @@ type Consumer struct {
 // NewConsumer will create and return a new consumer.
 func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer {
 	// check name
-	if config.Name == "" {
+	if table != nil && config.Name == "" {
 		panic("quasar: missing name")
 	}
 
@@ -75,6 +78,7 @@ func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer 
 		ledger: ledger,
 		table:  table,
 		config: config,
+		start:  config.Start,
 		pipe:   make(chan Entry, config.Batch),
 		marks:  make(chan uint64, config.Window),
 	}
@@ -149,33 +153,34 @@ func (w *Consumer) reader() error {
 }
 
 func (w *Consumer) worker() error {
+	// prepare stored markers
+	storedMarkers := map[uint64]bool{}
+
 	// fetch stored sequences
-	storedSequences, err := w.table.Get(w.config.Name)
-	if err != nil {
-		select {
-		case w.config.Errors <- err:
-		default:
+	if w.table != nil {
+		storedSequences, err := w.table.Get(w.config.Name)
+		if err != nil {
+			select {
+			case w.config.Errors <- err:
+			default:
+			}
+
+			return err
 		}
 
-		return err
-	}
+		// set start to first sequence if available
+		if len(storedSequences) > 0 {
+			w.start = storedSequences[0]
+		}
 
-	// set start to first sequence if available
-	if len(storedSequences) > 0 {
-		w.start = storedSequences[0]
+		// set stored markers
+		for _, seq := range storedSequences {
+			storedMarkers[seq] = true
+		}
 	}
 
 	// run reader
 	w.tomb.Go(w.reader)
-
-	// compute stored markers
-	storedMarkers := map[uint64]bool{}
-	for _, seq := range storedSequences {
-		storedMarkers[seq] = true
-	}
-
-	// unset stored sequences
-	storedSequences = nil
 
 	// prepare markers
 	markers := map[uint64]bool{}
@@ -190,7 +195,7 @@ func (w *Consumer) worker() error {
 		// check if closed
 		if !w.tomb.Alive() {
 			// store potentially uncommitted sequences if skip is enabled
-			if w.config.Skip > 0 {
+			if w.table != nil && w.config.Skip > 0 {
 				// compile markers
 				list := compileAndCompressMarkers(markers)
 
@@ -235,13 +240,22 @@ func (w *Consumer) worker() error {
 				continue
 			}
 
+			// set marker if not temporary
+			if w.table != nil {
+				markers[entry.Sequence] = false
+			}
+
 			// add entry
-			markers[entry.Sequence] = false
 			buffer = append(buffer, entry)
 		case dynQueue <- dynEntry:
 			// remove entry from queue
 			buffer = buffer[1:]
 		case sequence := <-w.marks:
+			// ignore if temporary
+			if w.table == nil {
+				continue
+			}
+
 			// check sequence
 			_, ok := markers[sequence]
 			if !ok {
