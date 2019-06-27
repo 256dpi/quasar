@@ -77,7 +77,7 @@ func consumer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) 
 		Entries: entries,
 		Errors:  errors,
 		Batch:   batch,
-		Window:  batch * 10,
+		Window:  batch * 2,
 		Skip:    batch,
 	})
 
