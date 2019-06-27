@@ -79,6 +79,11 @@ func (c *Consumer) Ack(position uint64) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
+	// check if closed
+	if !c.tomb.Alive() {
+		return tomb.ErrDying
+	}
+
 	// return immediately if lower or equal
 	if position <= c.head {
 		return nil
@@ -112,8 +117,18 @@ func (c *Consumer) Ack(position uint64) error {
 
 // Close will close the consumer.
 func (c *Consumer) Close() {
+	// acquire mutex
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	// close worker
 	c.tomb.Kill(nil)
 	_ = c.tomb.Wait()
+
+	// try to save potentially uncommitted head if skip is enabled
+	if c.config.Skip > 0 {
+		_ = c.table.Set(c.config.Name, c.head)
+	}
 }
 
 func (c *Consumer) worker() error {
@@ -133,7 +148,7 @@ func (c *Consumer) worker() error {
 		return err
 	}
 
-	// advanced position
+	// advance position
 	position++
 
 	for {

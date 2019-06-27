@@ -202,8 +202,17 @@ func TestConsumerSkipping(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(3), position)
 
+	entry = <-entries
+
+	err = consumer.Ack(entry.Sequence)
+	assert.NoError(t, err)
+
 	consumer.Close()
 	assert.Empty(t, errors)
+
+	position, err = table.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(4), position)
 
 	err = db.Close()
 	assert.NoError(t, err)
