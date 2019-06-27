@@ -434,9 +434,7 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 
 		// remove deleted entries from cache
 		if l.cache != nil && tail > 0 {
-			l.cache.Trim(func(entry Entry) bool {
-				return entry.Sequence <= tail
-			})
+			l.cache.Trim(tail)
 		}
 
 		// increment counter

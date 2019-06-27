@@ -58,17 +58,17 @@ func (q *Cache) Scan(fn func(int, Entry) bool) {
 	}
 }
 
-// Trim will iterate over the cache entries and remove them until false is
-// returned.
-func (q *Cache) Trim(fn func(Entry) bool) {
+// Trim will remove entries from the cache with a sequence up to and including
+// the provided sequence.
+func (q *Cache) Trim(sequence uint64) {
 	// acquire mutex
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
 
 	// iterate through from tail to head
 	for i := 0; i < q.count; i++ {
-		// return if false
-		if !fn(q.nodes[q.wrap(q.tail+i)]) {
+		// return if entry is after provided sequence
+		if q.nodes[q.wrap(q.tail+i)].Sequence > sequence {
 			return
 		}
 

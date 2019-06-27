@@ -51,9 +51,7 @@ func TestCache(t *testing.T) {
 	})
 	assert.Equal(t, []Entry{entry2, entry3}, list)
 
-	cache.Trim(func(entry Entry) bool {
-		return entry.Sequence <= 2
-	})
+	cache.Trim(2)
 
 	list = nil
 	cache.Scan(func(_ int, msg Entry) bool {
