@@ -426,6 +426,90 @@ func TestWorkerUnblock(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestWorkerResumeOutOfRange(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	assert.NoError(t, err)
+
+	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	assert.NoError(t, err)
+
+	for i := 1; i <= 100; i++ {
+		err = ledger.Write(Entry{
+			Sequence: uint64(i),
+			Payload:  []byte("foo"),
+		})
+		assert.NoError(t, err)
+	}
+
+	counter := 0
+	entries := make(chan Entry, 1)
+	errors := make(chan error, 1)
+
+	worker := NewWorker(ledger, matrix, WorkerConfig{
+		Name:    "foo",
+		Entries: entries,
+		Errors:  errors,
+		Batch:   10,
+	})
+
+	for {
+		counter++
+
+		entry := <-entries
+		assert.Equal(t, uint64(counter), entry.Sequence)
+		assert.Equal(t, []byte("foo"), entry.Payload)
+
+		worker.Ack(entry.Sequence)
+
+		if counter == 50 {
+			break
+		}
+	}
+
+	worker.Close()
+	assert.Empty(t, errors)
+
+	_, err = ledger.Delete(60)
+	assert.NoError(t, err)
+
+	counter += 10
+
+	entries = make(chan Entry, 10)
+
+	worker = NewWorker(ledger, matrix, WorkerConfig{
+		Name:    "foo",
+		Entries: entries,
+		Errors:  errors,
+		Batch:   10,
+	})
+
+	for {
+		counter++
+
+		entry := <-entries
+		assert.Equal(t, uint64(counter), entry.Sequence)
+		assert.Equal(t, []byte("foo"), entry.Payload)
+
+		worker.Ack(entry.Sequence)
+
+		if counter == 90 {
+			break
+		}
+	}
+
+	worker.Close()
+	assert.Empty(t, errors)
+
+	position, err := matrix.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, []uint64{90}, position)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func TestWorkerInvalidSequence(t *testing.T) {
 	db := openDB(true)
 
