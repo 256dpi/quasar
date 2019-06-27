@@ -31,6 +31,8 @@ func producer(ledger *quasar.Ledger, done <-chan struct{}) {
 	producer := quasar.NewProducer(ledger, quasar.ProducerConfig{
 		Batch:   batch,
 		Timeout: time.Millisecond,
+		Retry:   100,
+		Delay:   10 * time.Millisecond,
 	})
 
 	// ensure closing
@@ -166,7 +168,6 @@ func cleaner(ledger *quasar.Ledger, matrix *quasar.Matrix, done <-chan struct{})
 	// create cleaner
 	cleaner := quasar.NewCleaner(ledger, quasar.CleanerConfig{
 		Retention: 10000,
-		Threshold: 100000,
 		Matrices:  []*quasar.Matrix{matrix},
 		Interval:  100 * time.Millisecond,
 		Errors:    errors,
@@ -210,6 +211,7 @@ func main() {
 	ledger, err := quasar.CreateLedger(db, quasar.LedgerConfig{
 		Prefix: "ledger",
 		Cache:  batch * 10,
+		Limit:  batch * 1000,
 	})
 	if err != nil {
 		panic(err)
