@@ -31,7 +31,7 @@ type ConsumerConfig struct {
 	// The maximal size of the unprocessed sequence range.
 	Window int
 
-	// The number of acks to skip before a new one is written.
+	// The number of acks to skip before sequences are written to the table.
 	Skip int
 }
 
@@ -46,7 +46,9 @@ type Consumer struct {
 	tomb   tomb.Tomb
 }
 
-// NewConsumer will create and return a new consumer.
+// NewConsumer will create and return a new consumer. If table is given, the
+// consumer will persists processed sequences according to the provided
+// configuration.
 func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer {
 	// check name
 	if table != nil && config.Name == "" {
