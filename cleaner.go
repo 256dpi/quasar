@@ -17,9 +17,6 @@ type CleanerConfig struct {
 	// The interval of cleanings.
 	Interval time.Duration
 
-	// The tables to check for minimal positions.
-	Tables []*Table
-
 	// The matrices to check for minimal positions.
 	Matrices []*Matrix
 
@@ -28,7 +25,7 @@ type CleanerConfig struct {
 }
 
 // Cleaner will periodically delete entries from a ledger honoring min and max
-// retentions and positions from tables and matrices. Failed cleanings are retried
+// retentions and positions from matrices. Failed cleanings are retried
 // and the errors are sent on the supplied channel.
 type Cleaner struct {
 	ledger *Ledger
@@ -100,7 +97,7 @@ func (c *Cleaner) clean() error {
 	}
 
 	// prefetch threshold position. this will make sure that we properly honor
-	// the low positions of tables and matrices if a lot of entries are written
+	// the low positions of matrices if a lot of entries are written
 	// during the cleaning
 	var threshold uint64
 	if c.config.Threshold > 0 {
@@ -113,20 +110,6 @@ func (c *Cleaner) clean() error {
 		// unset threshold if not found
 		if !ok {
 			threshold = 0
-		}
-	}
-
-	// honor lowest table positions
-	for _, table := range c.config.Tables {
-		// get lowest position in table
-		tablePosition, _, err := table.Range()
-		if err != nil {
-			return err
-		}
-
-		// set to lowest position if valid
-		if tablePosition > 0 && position > tablePosition {
-			position = tablePosition
 		}
 	}
 
