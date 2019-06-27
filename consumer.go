@@ -75,6 +75,11 @@ func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer 
 		config.Window = 1
 	}
 
+	// check skip
+	if config.Skip >= config.Window {
+		panic("quasar: skip bigger or equal as window")
+	}
+
 	// prepare consumer
 	c := &Consumer{
 		ledger: ledger,
