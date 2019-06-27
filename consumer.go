@@ -161,12 +161,12 @@ func (c *Consumer) reader() error {
 
 func (c *Consumer) worker() error {
 	// prepare stored markers
-	storedMarkers := map[uint64]bool{}
+	var storedSequences []uint64
 
 	// check if persistent
 	if c.table != nil {
 		// fetch stored sequences
-		storedSequences, err := c.table.Get(c.config.Name)
+		sequences, err := c.table.Get(c.config.Name)
 		if err != nil {
 			select {
 			case c.config.Errors <- err:
@@ -176,23 +176,25 @@ func (c *Consumer) worker() error {
 			return err
 		}
 
-		// set start to first sequence if available
-		if len(storedSequences) > 0 {
-			c.start = storedSequences[0]
-		}
-
-		// set stored markers
-		for _, seq := range storedSequences {
-			storedMarkers[seq] = true
-		}
-
-		// store initial start sequence in table
-		if storedSequences == nil {
+		// check sequences haven been recovered
+		if len(sequences) > 0 {
+			// set start to first sequence
+			c.start = sequences[0]
+		} else {
+			// store provided initial start sequence in table
 			err := c.table.Set(c.config.Name, []uint64{c.start})
 			if err != nil {
+				select {
+				case c.config.Errors <- err:
+				default:
+				}
+
 				return err
 			}
 		}
+
+		// set sequences
+		storedSequences = sequences
 	}
 
 	// run reader
@@ -207,6 +209,9 @@ func (c *Consumer) worker() error {
 	// prepare skipped
 	var skipped int
 
+	// prepare first flag
+	first := true
+
 	for {
 		// check if closed
 		if !c.tomb.Alive() {
@@ -218,6 +223,11 @@ func (c *Consumer) worker() error {
 				// store sequences in table
 				err := c.table.Set(c.config.Name, list)
 				if err != nil {
+					select {
+					case c.config.Errors <- err:
+					default:
+					}
+
 					return err
 				}
 			}
@@ -246,13 +256,20 @@ func (c *Consumer) worker() error {
 		// receive entry, queue entry or receive mark
 		select {
 		case entry := <-dynPipe:
-			// skip already processed entry
-			if ok, _ := markers[entry.Sequence]; ok {
-				continue
+			// restore stored sequences that are newer or equal to first entry
+			if first {
+				for _, seq := range storedSequences {
+					if seq >= entry.Sequence {
+						markers[seq] = true
+					}
+				}
+
+				// reset flag
+				first = false
 			}
 
-			// skip entry processed in old session
-			if ok, _ := storedMarkers[entry.Sequence]; ok {
+			// skip already processed entry
+			if ok, _ := markers[entry.Sequence]; ok {
 				continue
 			}
 
