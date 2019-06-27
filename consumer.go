@@ -90,39 +90,39 @@ func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer 
 }
 
 // Ack will acknowledge the consumption of the specified sequence.
-func (w *Consumer) Ack(sequence uint64) {
+func (c *Consumer) Ack(sequence uint64) {
 	select {
-	case w.marks <- sequence:
-	case <-w.tomb.Dying():
+	case c.marks <- sequence:
+	case <-c.tomb.Dying():
 	}
 }
 
 // Close will close the consumer.
-func (w *Consumer) Close() {
-	w.tomb.Kill(nil)
-	_ = w.tomb.Wait()
+func (c *Consumer) Close() {
+	c.tomb.Kill(nil)
+	_ = c.tomb.Wait()
 }
 
-func (w *Consumer) reader() error {
+func (c *Consumer) reader() error {
 	// subscribe to notifications
 	notifications := make(chan uint64, 1)
-	w.ledger.Subscribe(notifications)
-	defer w.ledger.Unsubscribe(notifications)
+	c.ledger.Subscribe(notifications)
+	defer c.ledger.Unsubscribe(notifications)
 
 	// get initial position
-	position := w.start
+	position := c.start
 
 	for {
 		// check if closed
-		if !w.tomb.Alive() {
+		if !c.tomb.Alive() {
 			return tomb.ErrDying
 		}
 
 		// wait for notification if no new data in ledger
-		if w.ledger.Head() < position {
+		if c.ledger.Head() < position {
 			select {
 			case <-notifications:
-			case <-w.tomb.Dying():
+			case <-c.tomb.Dying():
 				return tomb.ErrDying
 			}
 
@@ -130,10 +130,10 @@ func (w *Consumer) reader() error {
 		}
 
 		// read entries
-		entries, err := w.ledger.Read(position, w.config.Batch)
+		entries, err := c.ledger.Read(position, c.config.Batch)
 		if err != nil {
 			select {
-			case w.config.Errors <- err:
+			case c.config.Errors <- err:
 			default:
 			}
 
@@ -143,25 +143,25 @@ func (w *Consumer) reader() error {
 		// put entries on pipe
 		for _, entry := range entries {
 			select {
-			case w.pipe <- entry:
+			case c.pipe <- entry:
 				position = entry.Sequence + 1
-			case <-w.tomb.Dying():
+			case <-c.tomb.Dying():
 				return tomb.ErrDying
 			}
 		}
 	}
 }
 
-func (w *Consumer) worker() error {
+func (c *Consumer) worker() error {
 	// prepare stored markers
 	storedMarkers := map[uint64]bool{}
 
 	// fetch stored sequences
-	if w.table != nil {
-		storedSequences, err := w.table.Get(w.config.Name)
+	if c.table != nil {
+		storedSequences, err := c.table.Get(c.config.Name)
 		if err != nil {
 			select {
-			case w.config.Errors <- err:
+			case c.config.Errors <- err:
 			default:
 			}
 
@@ -170,7 +170,7 @@ func (w *Consumer) worker() error {
 
 		// set start to first sequence if available
 		if len(storedSequences) > 0 {
-			w.start = storedSequences[0]
+			c.start = storedSequences[0]
 		}
 
 		// set stored markers
@@ -180,7 +180,7 @@ func (w *Consumer) worker() error {
 	}
 
 	// run reader
-	w.tomb.Go(w.reader)
+	c.tomb.Go(c.reader)
 
 	// prepare markers
 	markers := map[uint64]bool{}
@@ -193,14 +193,14 @@ func (w *Consumer) worker() error {
 
 	for {
 		// check if closed
-		if !w.tomb.Alive() {
+		if !c.tomb.Alive() {
 			// store potentially uncommitted sequences if skip is enabled
-			if w.table != nil && w.config.Skip > 0 {
+			if c.table != nil && c.config.Skip > 0 {
 				// compile markers
 				list := compileAndCompressMarkers(markers)
 
 				// store sequences in table
-				err := w.table.Set(w.config.Name, list)
+				err := c.table.Set(c.config.Name, list)
 				if err != nil {
 					return err
 				}
@@ -213,8 +213,8 @@ func (w *Consumer) worker() error {
 		var dynPipe <-chan Entry
 
 		// check if window is not full yet and
-		if len(markers) <= w.config.Window {
-			dynPipe = w.pipe
+		if len(markers) <= c.config.Window {
+			dynPipe = c.pipe
 		}
 
 		// prepare dynamic queue and entry
@@ -223,7 +223,7 @@ func (w *Consumer) worker() error {
 
 		// only queue an entry if one is available
 		if len(buffer) > 0 {
-			dynQueue = w.config.Entries
+			dynQueue = c.config.Entries
 			dynEntry = buffer[0]
 		}
 
@@ -241,7 +241,7 @@ func (w *Consumer) worker() error {
 			}
 
 			// set marker if not temporary
-			if w.table != nil {
+			if c.table != nil {
 				markers[entry.Sequence] = false
 			}
 
@@ -250,9 +250,9 @@ func (w *Consumer) worker() error {
 		case dynQueue <- dynEntry:
 			// remove entry from queue
 			buffer = buffer[1:]
-		case sequence := <-w.marks:
+		case sequence := <-c.marks:
 			// ignore if temporary
-			if w.table == nil {
+			if c.table == nil {
 				continue
 			}
 
@@ -260,7 +260,7 @@ func (w *Consumer) worker() error {
 			_, ok := markers[sequence]
 			if !ok {
 				select {
-				case w.config.Errors <- ErrInvalidSequence:
+				case c.config.Errors <- ErrInvalidSequence:
 				default:
 				}
 
@@ -271,12 +271,12 @@ func (w *Consumer) worker() error {
 			markers[sequence] = true
 
 			// handle skipping
-			if w.config.Skip > 0 {
+			if c.config.Skip > 0 {
 				// increment counter
 				skipped++
 
 				// return immediately when skipped
-				if skipped <= w.config.Skip {
+				if skipped <= c.config.Skip {
 					break
 				}
 
@@ -288,16 +288,16 @@ func (w *Consumer) worker() error {
 			list := compileAndCompressMarkers(markers)
 
 			// store sequences in table
-			err := w.table.Set(w.config.Name, list)
+			err := c.table.Set(c.config.Name, list)
 			if err != nil {
 				select {
-				case w.config.Errors <- err:
+				case c.config.Errors <- err:
 				default:
 				}
 
 				return err
 			}
-		case <-w.tomb.Dying():
+		case <-c.tomb.Dying():
 		}
 	}
 }
