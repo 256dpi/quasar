@@ -35,7 +35,7 @@ type ConsumerConfig struct {
 // Consumer manages consuming messages of a ledger using a sequence map.
 type Consumer struct {
 	ledger *Ledger
-	matrix *Matrix
+	table  *Table
 	config ConsumerConfig
 	start  uint64
 	pipe   chan Entry
@@ -44,7 +44,7 @@ type Consumer struct {
 }
 
 // NewConsumer will create and return a new consumer.
-func NewConsumer(ledger *Ledger, matrix *Matrix, config ConsumerConfig) *Consumer {
+func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer {
 	// check name
 	if config.Name == "" {
 		panic("quasar: missing name")
@@ -73,7 +73,7 @@ func NewConsumer(ledger *Ledger, matrix *Matrix, config ConsumerConfig) *Consume
 	// prepare consumer
 	c := &Consumer{
 		ledger: ledger,
-		matrix: matrix,
+		table:  table,
 		config: config,
 		pipe:   make(chan Entry, config.Batch),
 		marks:  make(chan uint64, config.Window),
@@ -150,7 +150,7 @@ func (w *Consumer) reader() error {
 
 func (w *Consumer) worker() error {
 	// fetch stored sequences
-	storedSequences, err := w.matrix.Get(w.config.Name)
+	storedSequences, err := w.table.Get(w.config.Name)
 	if err != nil {
 		select {
 		case w.config.Errors <- err:
@@ -194,8 +194,8 @@ func (w *Consumer) worker() error {
 				// compile markers
 				list := compileAndCompressMarkers(markers)
 
-				// store sequences in matrix
-				err := w.matrix.Set(w.config.Name, list)
+				// store sequences in table
+				err := w.table.Set(w.config.Name, list)
 				if err != nil {
 					return err
 				}
@@ -275,8 +275,8 @@ func (w *Consumer) worker() error {
 			// compile markers
 			list := compileAndCompressMarkers(markers)
 
-			// store sequences in matrix
-			err := w.matrix.Set(w.config.Name, list)
+			// store sequences in table
+			err := w.table.Set(w.config.Name, list)
 			if err != nil {
 				select {
 				case w.config.Errors <- err:

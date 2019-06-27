@@ -4,28 +4,28 @@ import (
 	"github.com/dgraph-io/badger/v2"
 )
 
-// MatrixConfig are used to configure a matrix.
-type MatrixConfig struct {
-	// The prefix for all matrix keys.
+// TableConfig are used to configure a table.
+type TableConfig struct {
+	// The prefix for all table keys.
 	Prefix string
 }
 
-// Matrix manages the storage of positions markers.
-type Matrix struct {
+// Table manages the storage of positions markers.
+type Table struct {
 	db     *DB
-	config MatrixConfig
+	config TableConfig
 	prefix []byte
 }
 
-// CreateMatrix will create a matrix that stores positions in the provided db.
-func CreateMatrix(db *DB, config MatrixConfig) (*Matrix, error) {
+// CreateTable will create a table that stores positions in the provided db.
+func CreateTable(db *DB, config TableConfig) (*Table, error) {
 	// check prefix
 	if config.Prefix == "" {
 		panic("quasar: missing prefix")
 	}
 
-	// create matrix
-	t := &Matrix{
+	// create table
+	t := &Table{
 		db:     db,
 		config: config,
 		prefix: append([]byte(config.Prefix), '!'),
@@ -34,8 +34,8 @@ func CreateMatrix(db *DB, config MatrixConfig) (*Matrix, error) {
 	return t, nil
 }
 
-// Set will write the specified sequences to the matrix.
-func (m *Matrix) Set(name string, sequences []uint64) error {
+// Set will write the specified sequences to the table.
+func (m *Table) Set(name string, sequences []uint64) error {
 	// set entry
 	err := retryUpdate(m.db, func(txn *badger.Txn) error {
 		return txn.SetEntry(&badger.Entry{
@@ -50,8 +50,8 @@ func (m *Matrix) Set(name string, sequences []uint64) error {
 	return nil
 }
 
-// Get will read the specified sequences from the matrix.
-func (m *Matrix) Get(name string) ([]uint64, error) {
+// Get will read the specified sequences from the table.
+func (m *Table) Get(name string) ([]uint64, error) {
 	// prepare sequences
 	var sequences []uint64
 
@@ -83,8 +83,8 @@ func (m *Matrix) Get(name string) ([]uint64, error) {
 	return sequences, nil
 }
 
-// Delete will remove the specified sequences from the matrix.
-func (m *Matrix) Delete(name string) error {
+// Delete will remove the specified sequences from the table.
+func (m *Table) Delete(name string) error {
 	// delete item
 	err := retryUpdate(m.db, func(txn *badger.Txn) error {
 		return txn.Delete(m.makeKey(name))
@@ -97,7 +97,7 @@ func (m *Matrix) Delete(name string) error {
 }
 
 // Count will return the number of stored sequences.
-func (m *Matrix) Count() (int, error) {
+func (m *Table) Count() (int, error) {
 	// prepare counter
 	var counter int
 
@@ -127,7 +127,7 @@ func (m *Matrix) Count() (int, error) {
 }
 
 // Range will return the range of stored positions.
-func (m *Matrix) Range() (uint64, uint64, error) {
+func (m *Table) Range() (uint64, uint64, error) {
 	// prepare counter
 	var min, max uint64
 
@@ -186,10 +186,10 @@ func (m *Matrix) Range() (uint64, uint64, error) {
 	return min, max, nil
 }
 
-// Clear will drop all matrix entries. Clear will temporarily block concurrent
+// Clear will drop all table entries. Clear will temporarily block concurrent
 // writes and deletes and lock the underlying database. Other users uf the same
 // database may receive errors due to the locked database.
-func (m *Matrix) Clear() error {
+func (m *Table) Clear() error {
 	// drop all entries
 	err := m.db.DropPrefix(m.prefix)
 	if err != nil {
@@ -199,7 +199,7 @@ func (m *Matrix) Clear() error {
 	return nil
 }
 
-func (m *Matrix) makeKey(name string) []byte {
+func (m *Table) makeKey(name string) []byte {
 	b := make([]byte, 0, len(m.prefix)+len(name))
 	return append(append(b, m.prefix...), []byte(name)...)
 }

@@ -94,13 +94,13 @@ func TestCleanerMaxRetention(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestCleanerMatrixPosition(t *testing.T) {
+func TestCleanerTablePosition(t *testing.T) {
 	db := openDB(true)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 20; i++ {
@@ -111,13 +111,13 @@ func TestCleanerMatrixPosition(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	err = matrix.Set("foo", []uint64{10, 12})
+	err = table.Set("foo", []uint64{10, 12})
 	assert.NoError(t, err)
 
 	cleaner := NewCleaner(ledger, CleanerConfig{
 		Retention: 5,
 		Threshold: 15,
-		Matrices:  []*Matrix{matrix},
+		Tables:    []*Table{table},
 		Interval:  10 * time.Millisecond,
 	})
 

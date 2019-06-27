@@ -18,7 +18,7 @@ type CleanerConfig struct {
 	Interval time.Duration
 
 	// The matrices to check for minimal positions.
-	Matrices []*Matrix
+	Tables []*Table
 
 	// The channel on which errors are sent.
 	Errors chan<- error
@@ -113,17 +113,17 @@ func (c *Cleaner) clean() error {
 		}
 	}
 
-	// honor lowest matrix positions
-	for _, matrix := range c.config.Matrices {
-		// get lowest position in matrix
-		matrixPosition, _, err := matrix.Range()
+	// honor lowest table sequence
+	for _, table := range c.config.Tables {
+		// get lowest sequence in table
+		tablePosition, _, err := table.Range()
 		if err != nil {
 			return err
 		}
 
 		// set to lowest position if valid
-		if matrixPosition > 0 && position > matrixPosition {
-			position = matrixPosition
+		if tablePosition > 0 && position > tablePosition {
+			position = tablePosition
 		}
 	}
 

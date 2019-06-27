@@ -7,46 +7,46 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMatrix(t *testing.T) {
+func TestTable(t *testing.T) {
 	db := openDB(true)
 
 	// open
 
-	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
-	assert.NotNil(t, matrix)
+	assert.NotNil(t, table)
 
-	count, err := matrix.Count()
+	count, err := table.Count()
 	assert.NoError(t, err)
 	assert.Equal(t, 0, count)
 
 	// set
 
-	err = matrix.Set("foo", []uint64{1})
+	err = table.Set("foo", []uint64{1})
 	assert.NoError(t, err)
 
-	position, err := matrix.Get("foo")
+	position, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{1}, position)
 
-	count, err = matrix.Count()
+	count, err = table.Count()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 
 	assert.Equal(t, map[string]string{
-		"matrix!foo": "1",
+		"table!foo": "1",
 	}, dump(db))
 
 	// delete
 
-	err = matrix.Delete("foo")
+	err = table.Delete("foo")
 	assert.NoError(t, err)
 
-	position, err = matrix.Get("foo")
+	position, err = table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64(nil), position)
 
-	count, err = matrix.Count()
+	count, err = table.Count()
 	assert.NoError(t, err)
 	assert.Equal(t, 0, count)
 
@@ -54,23 +54,23 @@ func TestMatrix(t *testing.T) {
 
 	// reset
 
-	err = matrix.Set("foo", []uint64{1})
+	err = table.Set("foo", []uint64{1})
 	assert.NoError(t, err)
 
-	position, err = matrix.Get("foo")
+	position, err = table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{1}, position)
 
-	count, err = matrix.Count()
+	count, err = table.Count()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 
 	// clear
 
-	err = matrix.Clear()
+	err = table.Clear()
 	assert.NoError(t, err)
 
-	count, err = matrix.Count()
+	count, err = table.Count()
 	assert.NoError(t, err)
 	assert.Equal(t, 0, count)
 
@@ -80,30 +80,30 @@ func TestMatrix(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestMatrixRange(t *testing.T) {
+func TestTableRange(t *testing.T) {
 	db := openDB(true)
 
-	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
-	assert.NotNil(t, matrix)
+	assert.NotNil(t, table)
 
-	min, max, err := matrix.Range()
+	min, max, err := table.Range()
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(0), min)
 	assert.Equal(t, uint64(0), max)
 
-	err = matrix.Set("foo", []uint64{7})
+	err = table.Set("foo", []uint64{7})
 	assert.NoError(t, err)
 
-	min, max, err = matrix.Range()
+	min, max, err = table.Range()
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(7), min)
 	assert.Equal(t, uint64(7), max)
 
-	err = matrix.Set("bar", []uint64{5, 13})
+	err = table.Set("bar", []uint64{5, 13})
 	assert.NoError(t, err)
 
-	min, max, err = matrix.Range()
+	min, max, err = table.Range()
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(5), min)
 	assert.Equal(t, uint64(13), max)
@@ -112,34 +112,34 @@ func TestMatrixRange(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestMatrixIsolation(t *testing.T) {
+func TestTableIsolation(t *testing.T) {
 	db := openDB(true)
 
 	set(db, "foo", "1")
-	set(db, "matrix!foo", "2")
-	set(db, "z-matrix!foo", "3")
+	set(db, "table!foo", "2")
+	set(db, "z-table!foo", "3")
 
-	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
-	assert.NotNil(t, matrix)
+	assert.NotNil(t, table)
 
-	count, err := matrix.Count()
+	count, err := table.Count()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 
-	position, err := matrix.Get("foo")
+	position, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{2}, position)
 }
 
-func TestMatrixReopen(t *testing.T) {
+func TestTableReopen(t *testing.T) {
 	db := openDB(true)
 
-	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
-	assert.NotNil(t, matrix)
+	assert.NotNil(t, table)
 
-	err = matrix.Set("foo", []uint64{1})
+	err = table.Set("foo", []uint64{1})
 	assert.NoError(t, err)
 
 	err = db.Close()
@@ -147,11 +147,11 @@ func TestMatrixReopen(t *testing.T) {
 
 	db = openDB(false)
 
-	matrix, err = CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err = CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
-	assert.NotNil(t, matrix)
+	assert.NotNil(t, table)
 
-	position, err := matrix.Get("foo")
+	position, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{1}, position)
 
@@ -159,10 +159,10 @@ func TestMatrixReopen(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func BenchmarkMatrixSet(b *testing.B) {
+func BenchmarkTableSet(b *testing.B) {
 	db := openDB(true)
 
-	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	if err != nil {
 		panic(err)
 	}
@@ -173,7 +173,7 @@ func BenchmarkMatrixSet(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		err = matrix.Set("foo", []uint64{uint64(b.N)})
+		err = table.Set("foo", []uint64{uint64(b.N)})
 		if err != nil {
 			panic(err)
 		}
@@ -187,17 +187,17 @@ func BenchmarkMatrixSet(b *testing.B) {
 	}
 }
 
-func BenchmarkMatrixGet(b *testing.B) {
+func BenchmarkTableGet(b *testing.B) {
 	db := openDB(true)
 
-	l, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	if err != nil {
 		panic(err)
 	}
 
 	time.Sleep(100 * time.Millisecond)
 
-	err = l.Set("foo", []uint64{1})
+	err = table.Set("foo", []uint64{1})
 	if err != nil {
 		panic(err)
 	}
@@ -206,7 +206,7 @@ func BenchmarkMatrixGet(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		_, err := l.Get("foo")
+		_, err := table.Get("foo")
 		if err != nil {
 			panic(err)
 		}
@@ -220,17 +220,17 @@ func BenchmarkMatrixGet(b *testing.B) {
 	}
 }
 
-func BenchmarkMatrixDelete(b *testing.B) {
+func BenchmarkTableDelete(b *testing.B) {
 	db := openDB(true)
 
-	l, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	if err != nil {
 		panic(err)
 	}
 
 	time.Sleep(100 * time.Millisecond)
 
-	err = l.Set("foo", []uint64{1})
+	err = table.Set("foo", []uint64{1})
 	if err != nil {
 		panic(err)
 	}
@@ -239,7 +239,7 @@ func BenchmarkMatrixDelete(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		err := l.Delete("foo")
+		err := table.Delete("foo")
 		if err != nil {
 			panic(err)
 		}

@@ -14,7 +14,7 @@ func TestConsumer(t *testing.T) {
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -29,7 +29,7 @@ func TestConsumer(t *testing.T) {
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	consumer := NewConsumer(ledger, matrix, ConsumerConfig{
+	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -58,7 +58,7 @@ func TestConsumer(t *testing.T) {
 
 	entries = make(chan Entry, 10)
 
-	consumer = NewConsumer(ledger, matrix, ConsumerConfig{
+	consumer = NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -85,7 +85,7 @@ func TestConsumer(t *testing.T) {
 	consumer.Close()
 	assert.Empty(t, errors)
 
-	sequences, err := matrix.Get("foo")
+	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{100}, sequences)
 
@@ -99,7 +99,7 @@ func TestConsumerSingular(t *testing.T) {
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -114,7 +114,7 @@ func TestConsumerSingular(t *testing.T) {
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	consumer := NewConsumer(ledger, matrix, ConsumerConfig{
+	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -143,7 +143,7 @@ func TestConsumerSingular(t *testing.T) {
 
 	entries = make(chan Entry, 10)
 
-	consumer = NewConsumer(ledger, matrix, ConsumerConfig{
+	consumer = NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -170,7 +170,7 @@ func TestConsumerSingular(t *testing.T) {
 	consumer.Close()
 	assert.Empty(t, errors)
 
-	sequences, err := matrix.Get("foo")
+	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{100}, sequences)
 
@@ -184,7 +184,7 @@ func TestConsumerRandom(t *testing.T) {
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -199,7 +199,7 @@ func TestConsumerRandom(t *testing.T) {
 	errors := make(chan error, 1)
 	signal := make(chan struct{}, 100)
 
-	consumer := NewConsumer(ledger, matrix, ConsumerConfig{
+	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -239,7 +239,7 @@ func TestConsumerRandom(t *testing.T) {
 	consumer.Close()
 	assert.Empty(t, errors)
 
-	sequences, err := matrix.Get("foo")
+	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{100}, sequences)
 
@@ -253,13 +253,13 @@ func TestConsumerOnDemand(t *testing.T) {
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	consumer := NewConsumer(ledger, matrix, ConsumerConfig{
+	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -300,7 +300,7 @@ func TestConsumerOnDemand(t *testing.T) {
 	consumer.Close()
 	assert.Empty(t, errors)
 
-	sequences, err := matrix.Get("foo")
+	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{100}, sequences)
 
@@ -314,7 +314,7 @@ func TestConsumerSkipping(t *testing.T) {
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -328,7 +328,7 @@ func TestConsumerSkipping(t *testing.T) {
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	consumer := NewConsumer(ledger, matrix, ConsumerConfig{
+	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -342,7 +342,7 @@ func TestConsumerSkipping(t *testing.T) {
 
 	time.Sleep(10 * time.Millisecond)
 
-	sequences, err := matrix.Get("foo")
+	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64(nil), sequences)
 
@@ -351,7 +351,7 @@ func TestConsumerSkipping(t *testing.T) {
 
 	time.Sleep(10 * time.Millisecond)
 
-	sequences, err = matrix.Get("foo")
+	sequences, err = table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64(nil), sequences)
 
@@ -360,7 +360,7 @@ func TestConsumerSkipping(t *testing.T) {
 
 	time.Sleep(10 * time.Millisecond)
 
-	sequences, err = matrix.Get("foo")
+	sequences, err = table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{3}, sequences)
 
@@ -372,7 +372,7 @@ func TestConsumerSkipping(t *testing.T) {
 	consumer.Close()
 	assert.Empty(t, errors)
 
-	sequences, err = matrix.Get("foo")
+	sequences, err = table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{4}, sequences)
 
@@ -386,7 +386,7 @@ func TestConsumerUnblock(t *testing.T) {
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	err = ledger.Write(Entry{
@@ -395,13 +395,13 @@ func TestConsumerUnblock(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = matrix.Set("foo", []uint64{1})
+	err = table.Set("foo", []uint64{1})
 	assert.NoError(t, err)
 
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	consumer := NewConsumer(ledger, matrix, ConsumerConfig{
+	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -432,7 +432,7 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -447,7 +447,7 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 	entries := make(chan Entry, 1)
 	errors := make(chan error, 1)
 
-	consumer := NewConsumer(ledger, matrix, ConsumerConfig{
+	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -478,7 +478,7 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 
 	entries = make(chan Entry, 10)
 
-	consumer = NewConsumer(ledger, matrix, ConsumerConfig{
+	consumer = NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
 		Errors:  errors,
@@ -502,7 +502,7 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 	consumer.Close()
 	assert.Empty(t, errors)
 
-	position, err := matrix.Get("foo")
+	position, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{90}, position)
 
@@ -516,12 +516,12 @@ func TestConsumerInvalidSequence(t *testing.T) {
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	matrix, err := CreateMatrix(db, MatrixConfig{Prefix: "matrix"})
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	errors := make(chan error, 1)
 
-	consumer := NewConsumer(ledger, matrix, ConsumerConfig{
+	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: make(chan Entry, 1),
 		Errors:  errors,

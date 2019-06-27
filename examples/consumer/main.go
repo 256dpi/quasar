@@ -64,7 +64,7 @@ func producer(ledger *quasar.Ledger, done <-chan struct{}) {
 	}
 }
 
-func consumer(ledger *quasar.Ledger, matrix *quasar.Matrix, done <-chan struct{}) {
+func consumer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
 	defer wg.Done()
 
 	// prepare channels
@@ -72,7 +72,7 @@ func consumer(ledger *quasar.Ledger, matrix *quasar.Matrix, done <-chan struct{}
 	errors := make(chan error, 1)
 
 	// create consumer
-	consumer := quasar.NewConsumer(ledger, matrix, quasar.ConsumerConfig{
+	consumer := quasar.NewConsumer(ledger, table, quasar.ConsumerConfig{
 		Name:    "example",
 		Entries: entries,
 		Errors:  errors,
@@ -159,7 +159,7 @@ func printer(ledger *quasar.Ledger, done <-chan struct{}) {
 	}
 }
 
-func cleaner(ledger *quasar.Ledger, matrix *quasar.Matrix, done <-chan struct{}) {
+func cleaner(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
 	defer wg.Done()
 
 	// prepare channels
@@ -168,7 +168,7 @@ func cleaner(ledger *quasar.Ledger, matrix *quasar.Matrix, done <-chan struct{})
 	// create cleaner
 	cleaner := quasar.NewCleaner(ledger, quasar.CleanerConfig{
 		Retention: 10000,
-		Matrices:  []*quasar.Matrix{matrix},
+		Tables:    []*quasar.Table{table},
 		Interval:  100 * time.Millisecond,
 		Errors:    errors,
 	})
@@ -217,9 +217,9 @@ func main() {
 		panic(err)
 	}
 
-	// open matrix
-	matrix, err := quasar.CreateMatrix(db, quasar.MatrixConfig{
-		Prefix: "matrix",
+	// open table
+	table, err := quasar.CreateTable(db, quasar.TableConfig{
+		Prefix: "table",
 	})
 	if err != nil {
 		panic(err)
@@ -231,8 +231,8 @@ func main() {
 	// run routines
 	wg.Add(4)
 	go producer(ledger, done)
-	go consumer(ledger, matrix, done)
-	go cleaner(ledger, matrix, done)
+	go consumer(ledger, table, done)
+	go cleaner(ledger, table, done)
 	go printer(ledger, done)
 
 	// prepare exit
