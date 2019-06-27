@@ -170,6 +170,18 @@ func (w *Worker) worker() error {
 	for {
 		// check if closed
 		if !w.tomb.Alive() {
+			// store potentially uncommitted sequences if skip is enabled
+			if w.config.Skip > 0 {
+				// compile markers
+				list := compileMarkers(markers)
+
+				// store sequences in matrix
+				err := w.matrix.Set(w.config.Name, list)
+				if err != nil {
+					return err
+				}
+			}
+
 			return tomb.ErrDying
 		}
 
@@ -238,35 +250,8 @@ func (w *Worker) worker() error {
 				skipped = 0
 			}
 
-			// compile list
-			var list []uint64
-			for seq, ok := range markers {
-				if ok {
-					list = append(list, seq)
-				}
-			}
-
-			// sort sequences
-			sort.Slice(list, func(i, j int) bool {
-				return list[i] < list[j]
-			})
-
-			// compact list and markers
-			for {
-				// stop if less than 2
-				if len(list) < 2 {
-					break
-				}
-
-				// stop if no positives at front
-				if !markers[list[0]] || !markers[list[1]] {
-					break
-				}
-
-				// remove first positive
-				delete(markers, list[0])
-				list = list[1:]
-			}
+			// compile markers
+			list := compileMarkers(markers)
 
 			// store sequences in matrix
 			err := w.matrix.Set(w.config.Name, list)
@@ -280,7 +265,40 @@ func (w *Worker) worker() error {
 			}
 		case <-notifications:
 		case <-w.tomb.Dying():
-			return tomb.ErrDying
 		}
 	}
+}
+
+func compileMarkers(markers map[uint64]bool) []uint64 {
+	// compile list
+	var list []uint64
+	for seq, ok := range markers {
+		if ok {
+			list = append(list, seq)
+		}
+	}
+
+	// sort sequences
+	sort.Slice(list, func(i, j int) bool {
+		return list[i] < list[j]
+	})
+
+	// compact list and markers
+	for {
+		// stop if less than 2
+		if len(list) < 2 {
+			break
+		}
+
+		// stop if no positives at front
+		if !markers[list[0]] || !markers[list[1]] {
+			break
+		}
+
+		// remove first positive
+		delete(markers, list[0])
+		list = list[1:]
+	}
+
+	return list
 }

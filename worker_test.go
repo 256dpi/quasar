@@ -279,8 +279,17 @@ func TestWorkerSkipping(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{3}, sequences)
 
+	entry = <-entries
+	worker.Ack(entry.Sequence)
+
+	time.Sleep(10 * time.Millisecond)
+
 	worker.Close()
 	assert.Empty(t, errors)
+
+	sequences, err = matrix.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, []uint64{4}, sequences)
 
 	err = db.Close()
 	assert.NoError(t, err)
