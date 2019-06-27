@@ -323,10 +323,8 @@ func (l *Ledger) Index(index int) (uint64, bool, error) {
 		index--
 	}
 
-	// prepare sequence
+	// prepare sequence and existing
 	var sequence uint64
-
-	// prepare flag
 	var existing bool
 
 	// find requested entry
@@ -380,14 +378,10 @@ func (l *Ledger) Index(index int) (uint64, bool, error) {
 			counter++
 
 			// check counter
-			if counter < (index + 1) {
-				continue
+			if counter >= (index + 1) {
+				existing = true
+				break
 			}
-
-			// set flag
-			existing = true
-
-			break
 		}
 
 		return nil
