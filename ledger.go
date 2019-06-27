@@ -416,60 +416,56 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 		sequence = head
 	}
 
-	// compute start and needle
-	start := l.makeEntryKey(0)
-	needle := l.makeEntryKey(sequence)
-
 	// prepare counter
 	var counter int
 
 	// delete in multiple attempts to honor max batch count
 	for {
 		// perform partial delete
-		end, n, err := l.partialDelete(start, needle)
+		tail, n, done, err := l.partialDelete(sequence)
 		if err != nil {
 			return counter, err
+		}
+
+		// decrement length
+		l.mutex.Lock()
+		l.length -= n
+		l.mutex.Unlock()
+
+		// remove deleted entries from cache
+		if l.cache != nil && tail > 0 {
+			l.cache.Trim(func(entry Entry) bool {
+				return entry.Sequence <= tail
+			})
 		}
 
 		// increment counter
 		counter += n
 
-		// check if end has been reached
-		if end == nil {
+		// check if done
+		if done {
 			break
 		}
-
-		// set new start
-		start = end
-	}
-
-	// decrement length
-	l.mutex.Lock()
-	l.length -= counter
-	l.mutex.Unlock()
-
-	// remove entries from cache
-	if l.cache != nil {
-		l.cache.Trim(func(entry Entry) bool {
-			return entry.Sequence <= sequence
-		})
 	}
 
 	return counter, nil
 }
 
-func (l *Ledger) partialDelete(start, needle []byte) ([]byte, int, error) {
-	// prepare counter
-	var counter int
+func (l *Ledger) partialDelete(sequence uint64) (uint64, int, bool, error) {
+	// compute needle
+	needle := l.makeEntryKey(sequence)
 
-	// prepare end
-	var end []byte
+	// prepare counter, tail and done
+	var counter int
+	var tail uint64
+	var done bool
 
 	// begin database update
 	err := retryUpdate(l.db, func(txn *badger.Txn) error {
 		// reset effects
 		counter = 0
-		end = nil
+		tail = 0
+		done = true
 
 		// create iterator
 		iter := txn.NewIterator(badger.IteratorOptions{
@@ -477,10 +473,16 @@ func (l *Ledger) partialDelete(start, needle []byte) ([]byte, int, error) {
 		})
 		defer iter.Close()
 
+		// cache last processed key
+		var last []byte
+
 		// delete all entries
-		for iter.Seek(start); iter.Valid(); iter.Next() {
+		for iter.Seek(l.makeEntryKey(0)); iter.Valid(); iter.Next() {
 			// copy key
 			key := iter.Item().KeyCopy(nil)
+
+			// set last
+			last = key
 
 			// delete entry
 			err := txn.Delete(key)
@@ -491,25 +493,37 @@ func (l *Ledger) partialDelete(start, needle []byte) ([]byte, int, error) {
 			// increment counter
 			counter++
 
-			// stop if found element is needle
-			if bytes.Equal(needle, key) {
+			// stop if current key is needle
+			if bytes.Equal(key, needle) {
 				break
 			}
 
-			// stop if exhausted
+			// stop if transaction is exhausted
 			if counter >= int(l.db.MaxBatchCount()-10) {
-				end = key
+				done = false
 				break
 			}
+		}
+
+		// get tail from last key if available
+		if last != nil {
+			// parse key
+			seq, err := DecodeSequence(last[len(l.entryPrefix):])
+			if err != nil {
+				return err
+			}
+
+			// set tail
+			tail = seq
 		}
 
 		return nil
 	})
 	if err != nil {
-		return nil, 0, err
+		return 0, 0, false, err
 	}
 
-	return end, counter, nil
+	return tail, counter, done, nil
 }
 
 // Length will return the number of stored entries.
