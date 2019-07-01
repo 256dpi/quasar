@@ -202,11 +202,11 @@ func main() {
 	}
 
 	// open db
-	db, done, err := quasar.OpenDB(dir, quasar.DBConfig{GCInterval: 10 * time.Second})
+	db, closer, err := quasar.OpenDB(dir, quasar.DBConfig{GCInterval: 10 * time.Second})
 	if err != nil {
 		panic(err)
 	}
-	defer done()
+	defer closer()
 
 	// open ledger
 	ledger, err := quasar.CreateLedger(db, quasar.LedgerConfig{
