@@ -44,7 +44,7 @@ type Ledger struct {
 	db     *DB
 	config LedgerConfig
 
-	cache       *Cache
+	cache       *Buffer
 	entryPrefix []byte
 	fieldPrefix []byte
 
@@ -67,9 +67,9 @@ func CreateLedger(db *DB, config LedgerConfig) (*Ledger, error) {
 	}
 
 	// prepare cache
-	var cache *Cache
+	var cache *Buffer
 	if config.Cache > 0 {
-		cache = NewCache(config.Cache)
+		cache = NewBuffer(config.Cache)
 	}
 
 	// create ledger
@@ -217,7 +217,7 @@ func (l *Ledger) Write(entries ...Entry) error {
 
 	// cache all entries
 	if l.cache != nil {
-		l.cache.Add(entries...)
+		l.cache.Push(entries...)
 	}
 
 	// send notifications to all receivers and skip full receivers
@@ -241,7 +241,11 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 
 	// attempt to read from cache if available
 	if l.cache != nil {
-		l.cache.Scan(func(i int, entry Entry) bool {
+		// prepare counter
+		i := 0
+
+		// iterate through buffer
+		l.cache.Scan(func(entry Entry) bool {
 			// stop if start sequence is not in cache
 			if i == 0 && sequence < entry.Sequence {
 				return false
@@ -256,6 +260,9 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 			if len(list) >= amount {
 				return false
 			}
+
+			// increment counter
+			i++
 
 			return true
 		})
@@ -428,7 +435,9 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 
 		// remove deleted entries from cache
 		if l.cache != nil && tail > 0 {
-			l.cache.Trim(tail)
+			l.cache.Trim(func(entry Entry) bool {
+				return entry.Sequence <= tail
+			})
 		}
 
 		// increment counter
