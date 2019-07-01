@@ -24,8 +24,9 @@ type DBConfig struct {
 	LogSink io.Writer
 }
 
-// OpenDB will open or create the specified db.
-func OpenDB(directory string, config DBConfig) (*DB, error) {
+// OpenDB will open or create the specified db. A function is returned that must
+// be called before closing the returned db to close the GC routine.
+func OpenDB(directory string, config DBConfig) (*DB, func(), error) {
 	// check directory
 	if directory == "" {
 		panic("quasar: missing directory")
@@ -34,7 +35,7 @@ func OpenDB(directory string, config DBConfig) (*DB, error) {
 	// ensure directory
 	err := os.MkdirAll(directory, 0777)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// prepare options
@@ -51,15 +52,22 @@ func OpenDB(directory string, config DBConfig) (*DB, error) {
 	// open db
 	db, err := badger.Open(bo)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+
+	// prepare channel
+	done := make(chan struct{})
 
 	// run gc routine if requested
 	if config.GCInterval > 0 {
 		go func() {
 			for {
 				// sleep some time
-				time.Sleep(config.GCInterval)
+				select {
+				case <-time.After(config.GCInterval):
+				case <-done:
+					return
+				}
 
 				// run gc
 				err = db.RunValueLogGC(0.75)
@@ -75,7 +83,12 @@ func OpenDB(directory string, config DBConfig) (*DB, error) {
 		}()
 	}
 
-	return db, nil
+	// create closer
+	closer := func() {
+		close(done)
+	}
+
+	return db, closer, nil
 }
 
 type logger struct {

@@ -3,7 +3,6 @@ package quasar
 import (
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 )
@@ -24,7 +23,7 @@ func openDB(clear bool) *DB {
 	}
 
 	// open db
-	db, err := OpenDB(dir, DBConfig{GCInterval: time.Minute})
+	db, _, err := OpenDB(dir, DBConfig{})
 	if err != nil {
 		panic(err)
 	}
