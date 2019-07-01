@@ -42,7 +42,7 @@ type Consumer struct {
 	config ConsumerConfig
 	start  uint64
 	pipe   chan Entry
-	marks  chan uint64
+	marks  chan seqAndAck
 	tomb   tomb.Tomb
 }
 
@@ -87,7 +87,7 @@ func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer 
 		config: config,
 		start:  config.Start,
 		pipe:   make(chan Entry, config.Batch),
-		marks:  make(chan uint64, config.Window),
+		marks:  make(chan seqAndAck, config.Window),
 	}
 
 	// run worker
@@ -96,10 +96,12 @@ func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer 
 	return c
 }
 
-// Ack will acknowledge the consumption of the specified sequence.
-func (c *Consumer) Ack(sequence uint64) {
+// Ack will acknowledge the consumption of the specified sequence. The specified
+// callback is called with the result of the processed ack. Skipped acks will
+// have their callback called right away.
+func (c *Consumer) Ack(sequence uint64, ack func(error)) {
 	select {
-	case c.marks <- sequence:
+	case c.marks <- seqAndAck{seq: sequence, ack: ack}:
 	case <-c.tomb.Dying():
 	}
 }
@@ -179,7 +181,7 @@ func (c *Consumer) worker() error {
 		// check sequences haven been recovered
 		if len(sequences) > 0 {
 			// set start to first sequence
-			c.start = sequences[0]+1
+			c.start = sequences[0] + 1
 		} else {
 			// store provided initial start sequence in table
 			err := c.table.Set(c.config.Name, []uint64{c.start})
@@ -288,25 +290,33 @@ func (c *Consumer) worker() error {
 			if c.table != nil {
 				markers[dynEntry.Sequence] = false
 			}
-		case sequence := <-c.marks:
+		case tuple := <-c.marks:
 			// ignore if temporary
 			if c.table == nil {
+				if tuple.ack != nil {
+					tuple.ack(nil)
+				}
+
 				continue
 			}
 
 			// check sequence
-			_, ok := markers[sequence]
+			_, ok := markers[tuple.seq]
 			if !ok {
 				select {
 				case c.config.Errors <- ErrInvalidSequence:
 				default:
 				}
 
+				if tuple.ack != nil {
+					tuple.ack(ErrInvalidSequence)
+				}
+
 				return ErrInvalidSequence
 			}
 
 			// mark sequence
-			markers[sequence] = true
+			markers[tuple.seq] = true
 
 			// handle skipping
 			if c.config.Skip > 0 {
@@ -315,6 +325,10 @@ func (c *Consumer) worker() error {
 
 				// return immediately when skipped
 				if skipped <= c.config.Skip {
+					if tuple.ack != nil {
+						tuple.ack(nil)
+					}
+
 					break
 				}
 
@@ -333,7 +347,16 @@ func (c *Consumer) worker() error {
 				default:
 				}
 
+				if tuple.ack != nil {
+					tuple.ack(nil)
+				}
+
 				return err
+			}
+
+			// call ack
+			if tuple.ack != nil {
+				tuple.ack(nil)
 			}
 		case <-c.tomb.Dying():
 		}

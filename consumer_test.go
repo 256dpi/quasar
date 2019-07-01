@@ -43,14 +43,16 @@ func TestConsumer(t *testing.T) {
 		assert.Equal(t, uint64(counter), entry.Sequence)
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
-		consumer.Ack(entry.Sequence)
+		ret := make(chan error, 1)
+		consumer.Ack(entry.Sequence, func(err error) {
+			ret <- err
+		})
+		assert.NoError(t, <-ret)
 
 		if counter == 50 {
 			break
 		}
 	}
-
-	time.Sleep(100 * time.Millisecond)
 
 	consumer.Close()
 	assert.Empty(t, errors)
@@ -71,14 +73,16 @@ func TestConsumer(t *testing.T) {
 		assert.Equal(t, uint64(counter), entry.Sequence, counter)
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
-		consumer.Ack(entry.Sequence)
+		ret := make(chan error, 1)
+		consumer.Ack(entry.Sequence, func(err error) {
+			ret <- err
+		})
+		assert.NoError(t, <-ret)
 
 		if counter == 100 {
 			break
 		}
 	}
-
-	time.Sleep(100 * time.Millisecond)
 
 	consumer.Close()
 	assert.Empty(t, errors)
@@ -127,14 +131,16 @@ func TestConsumerWindow(t *testing.T) {
 		assert.Equal(t, uint64(counter), entry.Sequence)
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
-		consumer.Ack(entry.Sequence)
+		ret := make(chan error, 1)
+		consumer.Ack(entry.Sequence, func(err error) {
+			ret <- err
+		})
+		assert.NoError(t, <-ret)
 
 		if counter == 50 {
 			break
 		}
 	}
-
-	time.Sleep(100 * time.Millisecond)
 
 	consumer.Close()
 	assert.Empty(t, errors)
@@ -156,14 +162,16 @@ func TestConsumerWindow(t *testing.T) {
 		assert.Equal(t, uint64(counter), entry.Sequence, counter)
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
-		consumer.Ack(entry.Sequence)
+		ret := make(chan error, 1)
+		consumer.Ack(entry.Sequence, func(err error) {
+			ret <- err
+		})
+		assert.NoError(t, <-ret)
 
 		if counter == 100 {
 			break
 		}
 	}
-
-	time.Sleep(100 * time.Millisecond)
 
 	consumer.Close()
 	assert.Empty(t, errors)
@@ -287,7 +295,12 @@ func TestConsumerSlowAck(t *testing.T) {
 
 				time.Sleep(time.Duration(rand.Intn(10000)) * time.Microsecond)
 
-				consumer.Ack(entry.Sequence)
+				ret := make(chan error, 1)
+				consumer.Ack(entry.Sequence, func(err error) {
+					ret <- err
+				})
+				assert.NoError(t, <-ret)
+
 				signal <- struct{}{}
 			}
 		}()
@@ -358,14 +371,16 @@ func TestConsumerSlowLedger(t *testing.T) {
 		assert.Equal(t, uint64(counter), entry.Sequence)
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
-		consumer.Ack(entry.Sequence)
+		ret := make(chan error, 1)
+		consumer.Ack(entry.Sequence, func(err error) {
+			ret <- err
+		})
+		assert.NoError(t, <-ret)
 
 		if counter == 100 {
 			break
 		}
 	}
-
-	time.Sleep(100 * time.Millisecond)
 
 	consumer.Close()
 	assert.Empty(t, errors)
@@ -408,7 +423,12 @@ func TestConsumerAckSkipping(t *testing.T) {
 	})
 
 	entry := <-entries
-	consumer.Ack(entry.Sequence)
+
+	ret := make(chan error, 1)
+	consumer.Ack(entry.Sequence, func(err error) {
+		ret <- err
+	})
+	assert.NoError(t, <-ret)
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -417,7 +437,12 @@ func TestConsumerAckSkipping(t *testing.T) {
 	assert.Equal(t, []uint64{0}, sequences)
 
 	entry = <-entries
-	consumer.Ack(entry.Sequence)
+
+	ret = make(chan error)
+	consumer.Ack(entry.Sequence, func(err error) {
+		ret <- err
+	})
+	assert.NoError(t, <-ret)
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -426,7 +451,12 @@ func TestConsumerAckSkipping(t *testing.T) {
 	assert.Equal(t, []uint64{0}, sequences)
 
 	entry = <-entries
-	consumer.Ack(entry.Sequence)
+
+	ret = make(chan error)
+	consumer.Ack(entry.Sequence, func(err error) {
+		ret <- err
+	})
+	assert.NoError(t, <-ret)
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -435,7 +465,12 @@ func TestConsumerAckSkipping(t *testing.T) {
 	assert.Equal(t, []uint64{3}, sequences)
 
 	entry = <-entries
-	consumer.Ack(entry.Sequence)
+
+	ret = make(chan error)
+	consumer.Ack(entry.Sequence, func(err error) {
+		ret <- err
+	})
+	assert.NoError(t, <-ret)
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -531,14 +566,16 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 		assert.Equal(t, uint64(counter), entry.Sequence)
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
-		consumer.Ack(entry.Sequence)
+		ret := make(chan error, 1)
+		consumer.Ack(entry.Sequence, func(err error) {
+			ret <- err
+		})
+		assert.NoError(t, <-ret)
 
 		if counter == 50 {
 			break
 		}
 	}
-
-	time.Sleep(100 * time.Millisecond)
 
 	consumer.Close()
 	assert.Empty(t, errors)
@@ -568,14 +605,16 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 		assert.Equal(t, uint64(counter), entry.Sequence)
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
-		consumer.Ack(entry.Sequence)
+		ret := make(chan error, 1)
+		consumer.Ack(entry.Sequence, func(err error) {
+			ret <- err
+		})
+		assert.NoError(t, <-ret)
 
 		if counter == 90 {
 			break
 		}
 	}
-
-	time.Sleep(100 * time.Millisecond)
 
 	consumer.Close()
 	assert.Empty(t, errors)
@@ -613,7 +652,11 @@ func TestConsumerInvalidSequence(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	consumer.Ack(2)
+	ret := make(chan error, 1)
+	consumer.Ack(2, func(err error) {
+		ret <- err
+	})
+	assert.Equal(t, ErrInvalidSequence, <-ret)
 
 	err = <-errors
 	assert.Equal(t, ErrInvalidSequence, err)
