@@ -110,7 +110,7 @@ func consumer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) 
 		mutex.Unlock()
 
 		// mark sequence
-		consumer.Mark(entry.Sequence, nil)
+		consumer.Mark(entry.Sequence, false, nil)
 	}
 }
 

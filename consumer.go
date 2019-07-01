@@ -2,7 +2,6 @@ package quasar
 
 import (
 	"errors"
-	"sort"
 
 	"gopkg.in/tomb.v2"
 )
@@ -10,6 +9,12 @@ import (
 // ErrInvalidSequence is returned if Mark() is called with a sequences that has
 // not yet been processed by the consumer.
 var ErrInvalidSequence = errors.New("invalid sequence")
+
+type markTuple struct {
+	seq uint64
+	cum bool
+	ack func(error)
+}
 
 // ConsumerConfig are used to configure a consumer.
 type ConsumerConfig struct {
@@ -42,7 +47,7 @@ type Consumer struct {
 	config ConsumerConfig
 	start  uint64
 	pipe   chan Entry
-	marks  chan seqAndAck
+	marks  chan markTuple
 	tomb   tomb.Tomb
 }
 
@@ -87,7 +92,7 @@ func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer 
 		config: config,
 		start:  config.Start,
 		pipe:   make(chan Entry, config.Batch),
-		marks:  make(chan seqAndAck, config.Window),
+		marks:  make(chan markTuple, config.Window),
 	}
 
 	// run worker
@@ -99,9 +104,13 @@ func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer 
 // Mark will acknowledge and mark the consumption of the specified sequence. The
 // specified callback is called with the result of the processed mark. Skipped
 // marks will have their callback called right away.
-func (c *Consumer) Mark(sequence uint64, ack func(error)) {
+func (c *Consumer) Mark(sequence uint64, cumulative bool, ack func(error)) {
 	select {
-	case c.marks <- seqAndAck{seq: sequence, ack: ack}:
+	case c.marks <- markTuple{
+		seq: sequence,
+		cum: cumulative,
+		ack: ack,
+	}:
 	case <-c.tomb.Dying():
 	}
 }
@@ -220,9 +229,9 @@ func (c *Consumer) worker() error {
 			// store potentially uncommitted sequences if skip is enabled
 			if c.table != nil && c.config.Skip > 0 {
 				// compile markers
-				list := compileAndCompressMarkers(markers)
+				list := CompileSequences(markers)
 
-				// store sequences in table
+				// store markers in table
 				err := c.table.Set(c.config.Name, list)
 				if err != nil {
 					select {
@@ -315,8 +324,18 @@ func (c *Consumer) worker() error {
 				return ErrInvalidSequence
 			}
 
-			// mark sequence
-			markers[tuple.seq] = true
+			// check if mark is cumulative
+			if tuple.cum {
+				// mark all sequences
+				for seq := range markers {
+					if seq <= tuple.seq {
+						markers[seq] = true
+					}
+				}
+			} else {
+				// mark single sequence
+				markers[tuple.seq] = true
+			}
 
 			// handle skipping
 			if c.config.Skip > 0 {
@@ -337,9 +356,9 @@ func (c *Consumer) worker() error {
 			}
 
 			// compile markers
-			list := compileAndCompressMarkers(markers)
+			list := CompileSequences(markers)
 
-			// store sequences in table
+			// store markers in table
 			err := c.table.Set(c.config.Name, list)
 			if err != nil {
 				select {
@@ -358,41 +377,14 @@ func (c *Consumer) worker() error {
 			if tuple.ack != nil {
 				tuple.ack(nil)
 			}
+
+			// compress markers
+			for seq := range markers {
+				if seq < list[0] {
+					delete(markers, seq)
+				}
+			}
 		case <-c.tomb.Dying():
 		}
 	}
-}
-
-func compileAndCompressMarkers(markers map[uint64]bool) []uint64 {
-	// compile list
-	var list []uint64
-	for seq, ok := range markers {
-		if ok {
-			list = append(list, seq)
-		}
-	}
-
-	// sort sequences
-	sort.Slice(list, func(i, j int) bool {
-		return list[i] < list[j]
-	})
-
-	// compact list and markers
-	for {
-		// stop if less than 2
-		if len(list) < 2 {
-			break
-		}
-
-		// stop if no positives at front
-		if !markers[list[0]] || !markers[list[1]] {
-			break
-		}
-
-		// remove first positive
-		delete(markers, list[0])
-		list = list[1:]
-	}
-
-	return list
 }
