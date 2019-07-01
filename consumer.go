@@ -267,7 +267,7 @@ func (c *Consumer) worker() error {
 			})
 		}
 
-		// receive entry, queue entry or receive mark
+		// buffer entry, queue entry or handle mark
 		select {
 		case entry := <-dynPipe:
 			// restore stored markers that are newer or equal to first entry
