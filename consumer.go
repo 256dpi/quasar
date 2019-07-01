@@ -172,12 +172,12 @@ func (c *Consumer) reader() error {
 
 func (c *Consumer) worker() error {
 	// prepare stored markers
-	var storedSequences []uint64
+	var storedMarkers []uint64
 
 	// check if persistent
 	if c.table != nil {
-		// fetch stored sequences
-		sequences, err := c.table.Get(c.config.Name)
+		// fetch stored markers
+		markers, err := c.table.Get(c.config.Name)
 		if err != nil {
 			select {
 			case c.config.Errors <- err:
@@ -187,10 +187,10 @@ func (c *Consumer) worker() error {
 			return err
 		}
 
-		// check sequences haven been recovered
-		if len(sequences) > 0 {
+		// check if markers haven been recovered
+		if len(markers) > 0 {
 			// set start to first sequence
-			c.start = sequences[0] + 1
+			c.start = markers[0] + 1
 		} else {
 			// store provided initial start sequence in table
 			err := c.table.Set(c.config.Name, []uint64{c.start})
@@ -204,8 +204,8 @@ func (c *Consumer) worker() error {
 			}
 		}
 
-		// set sequences
-		storedSequences = sequences
+		// set stored markers
+		storedMarkers = markers
 	}
 
 	// run reader
@@ -226,7 +226,7 @@ func (c *Consumer) worker() error {
 	for {
 		// check if closed
 		if !c.tomb.Alive() {
-			// store potentially uncommitted sequences if skip is enabled
+			// store potentially uncommitted markers if skip is enabled
 			if c.table != nil && c.config.Skip > 0 {
 				// compile markers
 				list := CompileSequences(markers)
@@ -270,9 +270,9 @@ func (c *Consumer) worker() error {
 		// receive entry, queue entry or receive mark
 		select {
 		case entry := <-dynPipe:
-			// restore stored sequences that are newer or equal to first entry
+			// restore stored markers that are newer or equal to first entry
 			if first {
-				for _, seq := range storedSequences {
+				for _, seq := range storedMarkers {
 					if seq >= dynEntry.Sequence {
 						markers[seq] = true
 					}
@@ -302,6 +302,7 @@ func (c *Consumer) worker() error {
 		case tuple := <-c.marks:
 			// ignore if temporary
 			if c.table == nil {
+				// call ack
 				if tuple.ack != nil {
 					tuple.ack(nil)
 				}
@@ -312,11 +313,13 @@ func (c *Consumer) worker() error {
 			// check sequence
 			_, ok := markers[tuple.seq]
 			if !ok {
+				// push error
 				select {
 				case c.config.Errors <- ErrInvalidSequence:
 				default:
 				}
 
+				// call ack
 				if tuple.ack != nil {
 					tuple.ack(ErrInvalidSequence)
 				}
@@ -344,11 +347,12 @@ func (c *Consumer) worker() error {
 
 				// return immediately when skipped
 				if skipped <= c.config.Skip {
+					// call ack
 					if tuple.ack != nil {
 						tuple.ack(nil)
 					}
 
-					break
+					continue
 				}
 
 				// otherwise reset counter
@@ -361,11 +365,13 @@ func (c *Consumer) worker() error {
 			// store markers in table
 			err := c.table.Set(c.config.Name, list)
 			if err != nil {
+				// push error
 				select {
 				case c.config.Errors <- err:
 				default:
 				}
 
+				// call ack
 				if tuple.ack != nil {
 					tuple.ack(nil)
 				}
