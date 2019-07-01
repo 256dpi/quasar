@@ -46,6 +46,65 @@ func TestProducer(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestProducerFilter(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	assert.NoError(t, err)
+
+	producer := NewProducer(ledger, ProducerConfig{
+		Batch:   5,
+		Timeout: time.Millisecond,
+		Filter:  true,
+	})
+
+	done1 := make(chan struct{})
+
+	for i := 1; i <= 10; i++ {
+		if i == 10 {
+			ok := producer.Write(Entry{Sequence: uint64(i), Payload: []byte("foo")}, func(err error) {
+				assert.NoError(t, err)
+				close(done1)
+			})
+			assert.True(t, ok)
+		} else {
+			ok := producer.Write(Entry{Sequence: uint64(i), Payload: []byte("foo")}, func(err error) {
+				assert.NoError(t, err)
+			})
+			assert.True(t, ok)
+		}
+	}
+
+	<-done1
+
+	done2 := make(chan struct{})
+
+	for i := 1; i <= 20; i++ {
+		if i == 20 {
+			ok := producer.Write(Entry{Sequence: uint64(i), Payload: []byte("foo")}, func(err error) {
+				assert.NoError(t, err)
+				close(done2)
+			})
+			assert.True(t, ok)
+		} else {
+			ok := producer.Write(Entry{Sequence: uint64(i), Payload: []byte("foo")}, func(err error) {
+				assert.NoError(t, err)
+			})
+			assert.True(t, ok)
+		}
+	}
+
+	<-done2
+
+	producer.Close()
+
+	length := ledger.Length()
+	assert.Equal(t, 20, length)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func TestProducerRetry(t *testing.T) {
 	db := openDB(true)
 

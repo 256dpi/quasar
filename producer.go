@@ -25,6 +25,10 @@ type ProducerConfig struct {
 
 	// The time after which a failed write due to ErrLimitReached is retried.
 	Delay time.Duration
+
+	// If enabled, the producer will filter out entries that have a lower
+	// sequence than the current ledger head.
+	Filter bool
 }
 
 // Producer provides an interface to efficiently batch entries and write them
@@ -151,6 +155,23 @@ func (p *Producer) worker() error {
 
 			// exit loop
 			break
+		}
+
+		// filter out old entries if requested
+		if p.config.Filter {
+			// get head
+			head := p.ledger.Head()
+
+			// collect new entries
+			newEntries := make([]Entry, 0, len(entries))
+			for _, entry := range entries {
+				if entry.Sequence > head {
+					newEntries = append(newEntries, entry)
+				}
+			}
+
+			// update list
+			entries = newEntries
 		}
 
 		// write entries
