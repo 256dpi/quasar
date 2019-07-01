@@ -92,6 +92,55 @@ func TestEncodeDecodeSequences(t *testing.T) {
 	assert.Equal(t, []uint64{}, list)
 }
 
+func TestCompileSequences(t *testing.T) {
+	table := []struct {
+		m map[uint64]bool
+		l []uint64
+	}{
+		// basic
+		{
+			m: map[uint64]bool{
+				1: true,
+				2: false,
+				3: true,
+				4: false,
+				5: true,
+				6: false,
+				7: true,
+			},
+			l: []uint64{1, 3, 5, 7},
+		},
+		// compress tail
+		{
+			m: map[uint64]bool{
+				1: true,
+				2: true,
+				3: false,
+				4: true,
+				5: true,
+				6: false,
+				7: true,
+			},
+			l: []uint64{2, 4, 5, 7},
+		},
+		// inject start
+		{
+			m: map[uint64]bool{
+				2: false,
+				3: true,
+				4: false,
+				5: true,
+			},
+			l: []uint64{1, 3, 5},
+		},
+	}
+
+	for i, item := range table {
+		l := CompileSequences(item.m)
+		assert.Equal(t, item.l, l, "test %d", i)
+	}
+}
+
 func BenchmarkGenerateSequence(b *testing.B) {
 	b.ReportAllocs()
 

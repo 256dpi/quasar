@@ -3,6 +3,7 @@ package quasar
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -117,4 +118,49 @@ func DecodeSequences(value []byte) ([]uint64, error) {
 	}
 
 	return list, nil
+}
+
+// CompileSequences will compile a list of positive sequences from the provided
+// mark table. It will compress positive adjacent tail sequences and inject a
+// fake positive sequence at the beginning if the first entry in the table is
+// negative.
+func CompileSequences(table map[uint64]bool) []uint64 {
+	// compile lists
+	var all = make([]uint64, 0, len(table))
+	var set = make([]uint64, 0, len(table))
+	for seq, ok := range table {
+		all = append(all, seq)
+
+		if ok {
+			set = append(set, seq)
+		}
+	}
+
+	// sort lists
+	sort.Slice(all, func(i, j int) bool { return all[i] < all[j] })
+	sort.Slice(set, func(i, j int) bool { return set[i] < set[j] })
+
+	// compact adjacent tails sequences
+	for {
+		// stop if less than two marked sequences remaining
+		if len(set) < 2 {
+			break
+		}
+
+		// stop if no adjacent positives at front
+		if set[0] != all[0] || set[1] != all[1] {
+			break
+		}
+
+		// remove first positive
+		all = all[1:]
+		set = set[1:]
+	}
+
+	// inject fake true start if required
+	if len(set) > 0 && set[0] != all[0] {
+		set = append([]uint64{all[0] - 1}, set...)
+	}
+
+	return set
 }
