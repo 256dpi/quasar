@@ -179,7 +179,7 @@ func (c *Consumer) worker() error {
 		// check sequences haven been recovered
 		if len(sequences) > 0 {
 			// set start to first sequence
-			c.start = sequences[0]
+			c.start = sequences[0]+1
 		} else {
 			// store provided initial start sequence in table
 			err := c.table.Set(c.config.Name, []uint64{c.start})
