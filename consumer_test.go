@@ -44,7 +44,7 @@ func TestConsumer(t *testing.T) {
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
 		ret := make(chan error, 1)
-		consumer.Ack(entry.Sequence, func(err error) {
+		consumer.Mark(entry.Sequence, func(err error) {
 			ret <- err
 		})
 		assert.NoError(t, <-ret)
@@ -74,7 +74,7 @@ func TestConsumer(t *testing.T) {
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
 		ret := make(chan error, 1)
-		consumer.Ack(entry.Sequence, func(err error) {
+		consumer.Mark(entry.Sequence, func(err error) {
 			ret <- err
 		})
 		assert.NoError(t, <-ret)
@@ -132,7 +132,7 @@ func TestConsumerWindow(t *testing.T) {
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
 		ret := make(chan error, 1)
-		consumer.Ack(entry.Sequence, func(err error) {
+		consumer.Mark(entry.Sequence, func(err error) {
 			ret <- err
 		})
 		assert.NoError(t, <-ret)
@@ -163,7 +163,7 @@ func TestConsumerWindow(t *testing.T) {
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
 		ret := make(chan error, 1)
-		consumer.Ack(entry.Sequence, func(err error) {
+		consumer.Mark(entry.Sequence, func(err error) {
 			ret <- err
 		})
 		assert.NoError(t, <-ret)
@@ -296,7 +296,7 @@ func TestConsumerSlowAck(t *testing.T) {
 				time.Sleep(time.Duration(rand.Intn(10000)) * time.Microsecond)
 
 				ret := make(chan error, 1)
-				consumer.Ack(entry.Sequence, func(err error) {
+				consumer.Mark(entry.Sequence, func(err error) {
 					ret <- err
 				})
 				assert.NoError(t, <-ret)
@@ -372,7 +372,7 @@ func TestConsumerSlowLedger(t *testing.T) {
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
 		ret := make(chan error, 1)
-		consumer.Ack(entry.Sequence, func(err error) {
+		consumer.Mark(entry.Sequence, func(err error) {
 			ret <- err
 		})
 		assert.NoError(t, <-ret)
@@ -425,7 +425,7 @@ func TestConsumerAckSkipping(t *testing.T) {
 	entry := <-entries
 
 	ret := make(chan error, 1)
-	consumer.Ack(entry.Sequence, func(err error) {
+	consumer.Mark(entry.Sequence, func(err error) {
 		ret <- err
 	})
 	assert.NoError(t, <-ret)
@@ -439,7 +439,7 @@ func TestConsumerAckSkipping(t *testing.T) {
 	entry = <-entries
 
 	ret = make(chan error)
-	consumer.Ack(entry.Sequence, func(err error) {
+	consumer.Mark(entry.Sequence, func(err error) {
 		ret <- err
 	})
 	assert.NoError(t, <-ret)
@@ -453,7 +453,7 @@ func TestConsumerAckSkipping(t *testing.T) {
 	entry = <-entries
 
 	ret = make(chan error)
-	consumer.Ack(entry.Sequence, func(err error) {
+	consumer.Mark(entry.Sequence, func(err error) {
 		ret <- err
 	})
 	assert.NoError(t, <-ret)
@@ -467,7 +467,7 @@ func TestConsumerAckSkipping(t *testing.T) {
 	entry = <-entries
 
 	ret = make(chan error)
-	consumer.Ack(entry.Sequence, func(err error) {
+	consumer.Mark(entry.Sequence, func(err error) {
 		ret <- err
 	})
 	assert.NoError(t, <-ret)
@@ -567,7 +567,7 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
 		ret := make(chan error, 1)
-		consumer.Ack(entry.Sequence, func(err error) {
+		consumer.Mark(entry.Sequence, func(err error) {
 			ret <- err
 		})
 		assert.NoError(t, <-ret)
@@ -606,7 +606,7 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
 		ret := make(chan error, 1)
-		consumer.Ack(entry.Sequence, func(err error) {
+		consumer.Mark(entry.Sequence, func(err error) {
 			ret <- err
 		})
 		assert.NoError(t, <-ret)
@@ -653,7 +653,7 @@ func TestConsumerInvalidSequence(t *testing.T) {
 	assert.NoError(t, err)
 
 	ret := make(chan error, 1)
-	consumer.Ack(2, func(err error) {
+	consumer.Mark(2, func(err error) {
 		ret <- err
 	})
 	assert.Equal(t, ErrInvalidSequence, <-ret)

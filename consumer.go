@@ -7,7 +7,7 @@ import (
 	"gopkg.in/tomb.v2"
 )
 
-// ErrInvalidSequence is returned if Ack() is called with a sequences that has
+// ErrInvalidSequence is returned if Mark() is called with a sequences that has
 // not yet been processed by the consumer.
 var ErrInvalidSequence = errors.New("invalid sequence")
 
@@ -96,10 +96,10 @@ func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer 
 	return c
 }
 
-// Ack will acknowledge the consumption of the specified sequence. The specified
-// callback is called with the result of the processed ack. Skipped acks will
-// have their callback called right away.
-func (c *Consumer) Ack(sequence uint64, ack func(error)) {
+// Mark will acknowledge and mark the consumption of the specified sequence. The
+// specified callback is called with the result of the processed mark. Skipped
+// marks will have their callback called right away.
+func (c *Consumer) Mark(sequence uint64, ack func(error)) {
 	select {
 	case c.marks <- seqAndAck{seq: sequence, ack: ack}:
 	case <-c.tomb.Dying():

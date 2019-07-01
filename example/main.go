@@ -109,8 +109,8 @@ func consumer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) 
 		diffs = append(diffs, diff)
 		mutex.Unlock()
 
-		// acknowledge
-		consumer.Ack(entry.Sequence)
+		// mark sequence
+		consumer.Mark(entry.Sequence, nil)
 	}
 }
 
