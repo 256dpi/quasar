@@ -373,16 +373,16 @@ func (c *Consumer) worker() error {
 				return err
 			}
 
-			// call ack
-			if tuple.ack != nil {
-				tuple.ack(nil)
-			}
-
 			// compress markers
 			for seq := range markers {
 				if seq < list[0] {
 					delete(markers, seq)
 				}
+			}
+
+			// call ack
+			if tuple.ack != nil {
+				tuple.ack(nil)
 			}
 		case <-c.tomb.Dying():
 		}
