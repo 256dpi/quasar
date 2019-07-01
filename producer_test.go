@@ -22,12 +22,16 @@ func TestProducer(t *testing.T) {
 
 	for i := 1; i <= 20; i++ {
 		if i == 20 {
-			producer.Write(Entry{Sequence: uint64(i), Payload: []byte("foo")}, func(err error) {
+			ok := producer.Write(Entry{Sequence: uint64(i), Payload: []byte("foo")}, func(err error) {
 				assert.NoError(t, err)
 				close(done)
 			})
+			assert.True(t, ok)
 		} else {
-			producer.Write(Entry{Sequence: uint64(i), Payload: []byte("foo")}, nil)
+			ok := producer.Write(Entry{Sequence: uint64(i), Payload: []byte("foo")}, func(err error) {
+				assert.NoError(t, err)
+			})
+			assert.True(t, ok)
 		}
 	}
 
@@ -71,13 +75,14 @@ func TestProducerRetry(t *testing.T) {
 	}()
 
 	for i := 1; i <= 20; i++ {
-		producer.Write(Entry{Sequence: uint64(i), Payload: []byte("foo")}, func(err error) {
+		ok := producer.Write(Entry{Sequence: uint64(i), Payload: []byte("foo")}, func(err error) {
 			errors <- err
 
 			if len(errors) >= 20 {
 				close(done)
 			}
 		})
+		assert.True(t, ok)
 	}
 
 	<-done
@@ -121,7 +126,11 @@ func BenchmarkProducer(b *testing.B) {
 				close(done)
 			})
 		} else {
-			producer.Write(Entry{Sequence: uint64(i), Payload: []byte("foo")}, nil)
+			producer.Write(Entry{Sequence: uint64(i), Payload: []byte("foo")}, func(err error) {
+				if err != nil {
+					panic(err)
+				}
+			})
 		}
 	}
 
