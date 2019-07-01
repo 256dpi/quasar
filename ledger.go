@@ -22,8 +22,12 @@ type Entry struct {
 	// The entries sequence (must be greater than zero).
 	Sequence uint64
 
-	// The entries payload.
+	// The entries payload that is written to disk.
 	Payload []byte
+
+	// The reference to a shared object. This can be used with cached ledgers
+	// to retain a reference to a decoded object of the entry.
+	Object interface{}
 }
 
 // LedgerConfig are used to configure a ledger.

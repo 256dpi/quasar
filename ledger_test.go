@@ -457,7 +457,7 @@ func TestLedgerCache(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
-	err = ledger.Write(Entry{Sequence: 1, Payload: []byte("foo")})
+	err = ledger.Write(Entry{Sequence: 1, Payload: []byte("foo"), Object: 1})
 	assert.NoError(t, err)
 
 	// cached read
@@ -465,13 +465,13 @@ func TestLedgerCache(t *testing.T) {
 	entries, err := ledger.Read(1, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, []Entry{
-		{Sequence: 1, Payload: []byte("foo")},
+		{Sequence: 1, Payload: []byte("foo"), Object: 1},
 	}, entries)
 
 	err = ledger.Write(
-		Entry{Sequence: 2, Payload: []byte("bar")},
-		Entry{Sequence: 3, Payload: []byte("baz")},
-		Entry{Sequence: 4, Payload: []byte("qux")},
+		Entry{Sequence: 2, Payload: []byte("bar"), Object: 2},
+		Entry{Sequence: 3, Payload: []byte("baz"), Object: 3},
+		Entry{Sequence: 4, Payload: []byte("qux"), Object: 4},
 	)
 	assert.NoError(t, err)
 
@@ -491,9 +491,9 @@ func TestLedgerCache(t *testing.T) {
 	entries, err = ledger.Read(2, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, []Entry{
-		{Sequence: 2, Payload: []byte("bar")},
-		{Sequence: 3, Payload: []byte("baz")},
-		{Sequence: 4, Payload: []byte("qux")},
+		{Sequence: 2, Payload: []byte("bar"), Object: 2},
+		{Sequence: 3, Payload: []byte("baz"), Object: 3},
+		{Sequence: 4, Payload: []byte("qux"), Object: 4},
 	}, entries)
 
 	// cache invalidation
