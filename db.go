@@ -62,7 +62,7 @@ func OpenDB(directory string, config DBConfig) (*DB, error) {
 				time.Sleep(config.GCInterval)
 
 				// run gc
-				err = db.RunValueLogGC(0.5)
+				err = db.RunValueLogGC(0.75)
 				if err == badger.ErrRejected {
 					return
 				} else if err != nil && err != badger.ErrNoRewrite && config.GCErrors != nil {
