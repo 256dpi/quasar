@@ -204,7 +204,7 @@ func (c *Consumer) worker() error {
 	markers := map[uint64]bool{}
 
 	// prepare buffer
-	var buffer []Entry
+	buffer := NewBuffer(c.config.Batch)
 
 	// prepare skipped
 	var skipped int
@@ -238,8 +238,8 @@ func (c *Consumer) worker() error {
 		// prepare dynamic pipe
 		var dynPipe <-chan Entry
 
-		// check if window is not full yet and
-		if len(markers) <= c.config.Window {
+		// only receive entry if buffer is not full yet
+		if buffer.Length() < c.config.Batch {
 			dynPipe = c.pipe
 		}
 
@@ -248,9 +248,12 @@ func (c *Consumer) worker() error {
 		var dynEntry Entry
 
 		// only queue an entry if one is available
-		if len(buffer) > 0 {
+		if buffer.Length() > 0 {
 			dynQueue = c.config.Entries
-			dynEntry = buffer[0]
+			buffer.Scan(func(entry Entry) bool {
+				dynEntry = entry
+				return false
+			})
 		}
 
 		// receive entry, queue entry or receive mark
@@ -259,7 +262,7 @@ func (c *Consumer) worker() error {
 			// restore stored sequences that are newer or equal to first entry
 			if first {
 				for _, seq := range storedSequences {
-					if seq >= entry.Sequence {
+					if seq >= dynEntry.Sequence {
 						markers[seq] = true
 					}
 				}
@@ -269,20 +272,22 @@ func (c *Consumer) worker() error {
 			}
 
 			// skip already processed entry
-			if ok, _ := markers[entry.Sequence]; ok {
+			if ok, _ := markers[dynEntry.Sequence]; ok {
 				continue
 			}
 
+			// add entry
+			buffer.Push(entry)
+		case dynQueue <- dynEntry:
+			// remove entry from buffer
+			buffer.Trim(func(entry Entry) bool {
+				return entry.Sequence <= dynEntry.Sequence
+			})
+
 			// set marker if not temporary
 			if c.table != nil {
-				markers[entry.Sequence] = false
+				markers[dynEntry.Sequence] = false
 			}
-
-			// add entry
-			buffer = append(buffer, entry)
-		case dynQueue <- dynEntry:
-			// remove entry from queue
-			buffer = buffer[1:]
 		case sequence := <-c.marks:
 			// ignore if temporary
 			if c.table == nil {

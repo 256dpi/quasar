@@ -26,8 +26,8 @@ func TestConsumer(t *testing.T) {
 	}
 
 	counter := 0
-	entries := make(chan Entry, 1)
-	errors := make(chan error, 1)
+	entries := make(chan Entry, 10)
+	errors := make(chan error, 10)
 
 	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
@@ -538,6 +538,8 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 		}
 	}
 
+	time.Sleep(100 * time.Millisecond)
+
 	consumer.Close()
 	assert.Empty(t, errors)
 
@@ -572,6 +574,8 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 			break
 		}
 	}
+
+	time.Sleep(100 * time.Millisecond)
 
 	consumer.Close()
 	assert.Empty(t, errors)
