@@ -373,7 +373,7 @@ func (c *Consumer) worker() error {
 
 				// call ack
 				if tuple.ack != nil {
-					tuple.ack(nil)
+					tuple.ack(err)
 				}
 
 				return err
