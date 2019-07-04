@@ -63,11 +63,12 @@ func TestQueue(t *testing.T) {
 		entry := <-entries
 		assert.Equal(t, uint64(i), entry.Sequence)
 
-		consumer.Mark(entry.Sequence, true, func(err error) {
+		ok := consumer.Mark(entry.Sequence, true, func(err error) {
 			if err != nil {
 				panic(err)
 			}
 		})
+		assert.True(t, ok)
 
 		if i == 25 {
 			break

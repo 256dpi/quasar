@@ -45,10 +45,11 @@ func TestConsumer(t *testing.T) {
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
 		ret := make(chan error, 1)
-		consumer.Mark(entry.Sequence, false, func(err error) {
+		ok := consumer.Mark(entry.Sequence, false, func(err error) {
 			ret <- err
 		})
 		assert.NoError(t, <-ret)
+		assert.True(t, ok)
 
 		if counter == 50 {
 			break
@@ -76,10 +77,11 @@ func TestConsumer(t *testing.T) {
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
 		ret := make(chan error, 1)
-		consumer.Mark(entry.Sequence, false, func(err error) {
+		ok := consumer.Mark(entry.Sequence, false, func(err error) {
 			ret <- err
 		})
 		assert.NoError(t, <-ret)
+		assert.True(t, ok)
 
 		if counter == 100 {
 			break
@@ -134,10 +136,11 @@ func TestConsumerWindow(t *testing.T) {
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
 		ret := make(chan error, 1)
-		consumer.Mark(entry.Sequence, false, func(err error) {
+		ok := consumer.Mark(entry.Sequence, false, func(err error) {
 			ret <- err
 		})
 		assert.NoError(t, <-ret)
+		assert.True(t, ok)
 
 		if counter == 50 {
 			break
@@ -166,10 +169,11 @@ func TestConsumerWindow(t *testing.T) {
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
 		ret := make(chan error, 1)
-		consumer.Mark(entry.Sequence, false, func(err error) {
+		ok := consumer.Mark(entry.Sequence, false, func(err error) {
 			ret <- err
 		})
 		assert.NoError(t, <-ret)
+		assert.True(t, ok)
 
 		if counter == 100 {
 			break
@@ -225,10 +229,11 @@ func TestConsumerCumulativeMarks(t *testing.T) {
 
 		if counter%10 == 0 {
 			ret := make(chan error, 1)
-			consumer.Mark(entry.Sequence, true, func(err error) {
+			ok := consumer.Mark(entry.Sequence, true, func(err error) {
 				ret <- err
 			})
 			assert.NoError(t, <-ret)
+			assert.True(t, ok)
 		}
 
 		if counter == 100 {
@@ -360,10 +365,11 @@ func TestConsumerUnorderedMarks(t *testing.T) {
 				time.Sleep(time.Duration(rand.Intn(10000)) * time.Microsecond)
 
 				ret := make(chan error, 1)
-				consumer.Mark(entry.Sequence, false, func(err error) {
+				ok = consumer.Mark(entry.Sequence, false, func(err error) {
 					ret <- err
 				})
 				assert.NoError(t, <-ret)
+				assert.True(t, ok)
 
 				signal <- struct{}{}
 			}
@@ -436,10 +442,11 @@ func TestConsumerSlowLedger(t *testing.T) {
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
 		ret := make(chan error, 1)
-		consumer.Mark(entry.Sequence, false, func(err error) {
+		ok := consumer.Mark(entry.Sequence, false, func(err error) {
 			ret <- err
 		})
 		assert.NoError(t, <-ret)
+		assert.True(t, ok)
 
 		if counter == 100 {
 			break
@@ -489,10 +496,11 @@ func TestConsumerSkipMark(t *testing.T) {
 	entry := <-entries
 
 	ret := make(chan error, 1)
-	consumer.Mark(entry.Sequence, false, func(err error) {
+	ok := consumer.Mark(entry.Sequence, false, func(err error) {
 		ret <- err
 	})
 	assert.NoError(t, <-ret)
+	assert.True(t, ok)
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -503,10 +511,11 @@ func TestConsumerSkipMark(t *testing.T) {
 	entry = <-entries
 
 	ret = make(chan error)
-	consumer.Mark(entry.Sequence, false, func(err error) {
+	ok = consumer.Mark(entry.Sequence, false, func(err error) {
 		ret <- err
 	})
 	assert.NoError(t, <-ret)
+	assert.True(t, ok)
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -517,10 +526,11 @@ func TestConsumerSkipMark(t *testing.T) {
 	entry = <-entries
 
 	ret = make(chan error)
-	consumer.Mark(entry.Sequence, false, func(err error) {
+	ok = consumer.Mark(entry.Sequence, false, func(err error) {
 		ret <- err
 	})
 	assert.NoError(t, <-ret)
+	assert.True(t, ok)
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -531,10 +541,11 @@ func TestConsumerSkipMark(t *testing.T) {
 	entry = <-entries
 
 	ret = make(chan error)
-	consumer.Mark(entry.Sequence, false, func(err error) {
+	ok = consumer.Mark(entry.Sequence, false, func(err error) {
 		ret <- err
 	})
 	assert.NoError(t, <-ret)
+	assert.True(t, ok)
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -631,10 +642,11 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
 		ret := make(chan error, 1)
-		consumer.Mark(entry.Sequence, false, func(err error) {
+		ok := consumer.Mark(entry.Sequence, false, func(err error) {
 			ret <- err
 		})
 		assert.NoError(t, <-ret)
+		assert.True(t, ok)
 
 		if counter == 50 {
 			break
@@ -671,10 +683,11 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
 		ret := make(chan error, 1)
-		consumer.Mark(entry.Sequence, false, func(err error) {
+		ok := consumer.Mark(entry.Sequence, false, func(err error) {
 			ret <- err
 		})
 		assert.NoError(t, <-ret)
+		assert.True(t, ok)
 
 		if counter == 90 {
 			break
@@ -717,10 +730,11 @@ func TestConsumerInvalidSequence(t *testing.T) {
 	assert.NoError(t, err)
 
 	ret := make(chan error, 1)
-	consumer.Mark(2, false, func(err error) {
+	ok := consumer.Mark(2, false, func(err error) {
 		ret <- err
 	})
 	assert.Equal(t, ErrInvalidSequence, <-ret)
+	assert.True(t, ok)
 
 	consumer.Close()
 

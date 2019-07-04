@@ -2,6 +2,7 @@ package quasar
 
 import (
 	"errors"
+	"sync"
 
 	"gopkg.in/tomb.v2"
 )
@@ -48,6 +49,8 @@ type Consumer struct {
 	start  uint64
 	pipe   chan Entry
 	marks  chan markTuple
+	mutex  sync.RWMutex
+	once   sync.Once
 	tomb   tomb.Tomb
 }
 
@@ -99,20 +102,44 @@ func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer 
 // Mark will acknowledge and mark the consumption of the specified sequence. The
 // specified callback is called with the result of the processed mark. Skipped
 // marks will have their callback called right away.
-func (c *Consumer) Mark(sequence uint64, cumulative bool, ack func(error)) {
-	select {
-	case c.marks <- markTuple{
+func (c *Consumer) Mark(sequence uint64, cumulative bool, ack func(error)) bool {
+	// check if closed
+	if !c.tomb.Alive() {
+		return false
+	}
+
+	// create tuple
+	tpl := markTuple{
 		seq: sequence,
 		cum: cumulative,
 		ack: ack,
-	}:
+	}
+
+	// acquire mutex
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
+	select {
+	case c.marks <- tpl:
+		return true
 	case <-c.tomb.Dying():
+		return false
 	}
 }
 
 // Close will close the consumer.
 func (c *Consumer) Close() {
+	// kill tomb
 	c.tomb.Kill(nil)
+
+	// close marks
+	c.once.Do(func() {
+		c.mutex.Lock()
+		close(c.marks)
+		c.mutex.Unlock()
+	})
+
+	// wait for exit
 	_ = c.tomb.Wait()
 }
 
