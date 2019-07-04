@@ -495,11 +495,10 @@ func TestConsumerSkipMark(t *testing.T) {
 
 	entry := <-entries
 
-	ret := make(chan error, 1)
+	ret1 := make(chan error, 1)
 	ok := consumer.Mark(entry.Sequence, false, func(err error) {
-		ret <- err
+		ret1 <- err
 	})
-	assert.NoError(t, <-ret)
 	assert.True(t, ok)
 
 	time.Sleep(10 * time.Millisecond)
@@ -510,11 +509,10 @@ func TestConsumerSkipMark(t *testing.T) {
 
 	entry = <-entries
 
-	ret = make(chan error)
+	ret2 := make(chan error, 1)
 	ok = consumer.Mark(entry.Sequence, false, func(err error) {
-		ret <- err
+		ret2 <- err
 	})
-	assert.NoError(t, <-ret)
 	assert.True(t, ok)
 
 	time.Sleep(10 * time.Millisecond)
@@ -525,14 +523,17 @@ func TestConsumerSkipMark(t *testing.T) {
 
 	entry = <-entries
 
-	ret = make(chan error)
+	ret3 := make(chan error, 1)
 	ok = consumer.Mark(entry.Sequence, false, func(err error) {
-		ret <- err
+		ret3 <- err
 	})
-	assert.NoError(t, <-ret)
 	assert.True(t, ok)
 
 	time.Sleep(10 * time.Millisecond)
+
+	assert.NoError(t, <-ret1)
+	assert.NoError(t, <-ret2)
+	assert.NoError(t, <-ret3)
 
 	sequences, err = table.Get("foo")
 	assert.NoError(t, err)
@@ -540,16 +541,17 @@ func TestConsumerSkipMark(t *testing.T) {
 
 	entry = <-entries
 
-	ret = make(chan error)
+	ret4 := make(chan error, 1)
 	ok = consumer.Mark(entry.Sequence, false, func(err error) {
-		ret <- err
+		ret4 <- err
 	})
-	assert.NoError(t, <-ret)
 	assert.True(t, ok)
 
 	time.Sleep(10 * time.Millisecond)
 
 	consumer.Close()
+
+	assert.Error(t, ErrConsumerClosed, <-ret4)
 
 	sequences, err = table.Get("foo")
 	assert.NoError(t, err)

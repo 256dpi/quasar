@@ -11,6 +11,9 @@ import (
 // not yet been processed by the consumer.
 var ErrInvalidSequence = errors.New("invalid sequence")
 
+// ErrConsumerClosed is yielded to callbacks if the consumer has been closed.
+var ErrConsumerClosed = errors.New("consumer closed")
+
 type markTuple struct {
 	seq uint64
 	cum bool
@@ -188,6 +191,15 @@ func (c *Consumer) reader() error {
 }
 
 func (c *Consumer) worker() error {
+	// cancel queued marks on exit
+	defer func() {
+		for tpl := range c.marks {
+			if tpl.ack != nil {
+				tpl.ack(ErrConsumerClosed)
+			}
+		}
+	}()
+
 	// prepare stored markers
 	var storedMarkers []uint64
 
@@ -225,7 +237,16 @@ func (c *Consumer) worker() error {
 	buffer := NewBuffer(c.config.Batch)
 
 	// prepare skipped
-	var skipped int
+	var skipped []func(error)
+
+	// cancel skipped acks on exit
+	defer func() {
+		for _, ack := range skipped {
+			if ack != nil {
+				ack(ErrConsumerClosed)
+			}
+		}
+	}()
 
 	// prepare first flag
 	first := true
@@ -336,23 +357,10 @@ func (c *Consumer) worker() error {
 				markers[tuple.seq] = true
 			}
 
-			// handle skipping
-			if c.config.Skip > 0 {
-				// increment counter
-				skipped++
-
-				// return immediately when skipped
-				if skipped <= c.config.Skip {
-					// call ack
-					if tuple.ack != nil {
-						tuple.ack(nil)
-					}
-
-					continue
-				}
-
-				// otherwise reset counter
-				skipped = 0
+			// cache ack if skipping is enabled and there is space
+			if c.config.Skip > 0 && len(skipped) < c.config.Skip {
+				skipped = append(skipped, tuple.ack)
+				continue
 			}
 
 			// compile markers
@@ -376,10 +384,20 @@ func (c *Consumer) worker() error {
 				}
 			}
 
-			// call ack
+			// call cached acks
+			for _, ack := range skipped {
+				if ack != nil {
+					ack(nil)
+				}
+			}
+
+			// call acks
 			if tuple.ack != nil {
 				tuple.ack(nil)
 			}
+
+			// reset list
+			skipped = nil
 		case <-c.tomb.Dying():
 		}
 	}
