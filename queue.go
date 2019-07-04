@@ -57,14 +57,19 @@ func CreateQueue(db *DB, config QueueConfig) (*Queue, error) {
 		return nil, err
 	}
 
-	// create cleaner
-	cleaner := NewCleaner(ledger, CleanerConfig{
-		Retention: config.Retention,
-		Threshold: config.Threshold,
-		Interval:  config.Interval,
-		Tables:    []*Table{table},
-		Errors:    config.Errors,
-	})
+	// prepare cleaner
+	var cleaner *Cleaner
+
+	// create cleaner if interval is set
+	if config.Interval > 0 {
+		cleaner = NewCleaner(ledger, CleanerConfig{
+			Retention: config.Retention,
+			Threshold: config.Threshold,
+			Interval:  config.Interval,
+			Tables:    []*Table{table},
+			Errors:    config.Errors,
+		})
+	}
 
 	return &Queue{
 		config:  config,
@@ -96,5 +101,7 @@ func (q *Queue) Consumer(config ConsumerConfig) *Consumer {
 
 // Close will close the queue.
 func (q *Queue) Close() {
-	q.cleaner.Close()
+	if q.cleaner != nil {
+		q.cleaner.Close()
+	}
 }
