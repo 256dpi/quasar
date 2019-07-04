@@ -22,7 +22,7 @@ type markTuple struct {
 
 // ConsumerConfig is used to configure a consumer.
 type ConsumerConfig struct {
-	// The name of the consumer.
+	// The name of the persistent consumer.
 	Name string
 
 	// The start position of the consumer if not recovered from the table.
@@ -61,9 +61,9 @@ type Consumer struct {
 // consumer will persists processed sequences according to the provided
 // configuration.
 func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer {
-	// check name
-	if table != nil && config.Name == "" {
-		panic("quasar: missing name")
+	// check table
+	if config.Name != "" && table == nil {
+		panic("quasar: missing table")
 	}
 
 	// check entries channel
@@ -94,6 +94,11 @@ func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer 
 		start:  config.Start,
 		pipe:   make(chan Entry, config.Batch),
 		marks:  make(chan markTuple, config.Window),
+	}
+
+	// unset table if name is missing
+	if config.Name == "" {
+		c.table = nil
 	}
 
 	// run worker
