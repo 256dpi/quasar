@@ -22,15 +22,13 @@ var recv int64
 var diffs []float64
 var mutex sync.Mutex
 
-const batch = 1000
-
 func producer(queue *quasar.Queue) {
 	// create producer
 	producer := queue.Producer(quasar.ProducerConfig{
-		Batch:   batch,
+		Batch:   2500,
 		Timeout: time.Millisecond,
-		Retry:   100,
-		Delay:   10 * time.Millisecond,
+		Retry:   100, // 10s
+		Delay:   100 * time.Millisecond,
 	})
 
 	// ensure closing
@@ -57,7 +55,7 @@ func producer(queue *quasar.Queue) {
 
 func consumer(queue *quasar.Queue) {
 	// prepare channels
-	entries := make(chan quasar.Entry, batch)
+	entries := make(chan quasar.Entry, 5000)
 
 	// create consumer
 	consumer := queue.Consumer(quasar.ConsumerConfig{
@@ -66,9 +64,9 @@ func consumer(queue *quasar.Queue) {
 		Errors: func(err error) {
 			panic(err)
 		},
-		Batch:  batch,
-		Window: batch * 2,
-		Skip:   batch,
+		Batch:  2500,
+		Window: 5000,
+		Skip:   2500,
 	})
 
 	// ensure closing
@@ -91,7 +89,11 @@ func consumer(queue *quasar.Queue) {
 		mutex.Unlock()
 
 		// mark sequence
-		consumer.Mark(entry.Sequence, false, nil)
+		consumer.Mark(entry.Sequence, false, func(err error) {
+			if err != nil {
+				panic(err)
+			}
+		})
 	}
 }
 
@@ -161,10 +163,10 @@ func main() {
 	// create queue
 	queue, err := quasar.CreateQueue(db, quasar.QueueConfig{
 		Prefix:    "queue",
-		Cache:     batch * 10,
-		Retention: 10000,
-		Limit:     batch * 1000,
-		Interval:  100 * time.Millisecond,
+		Cache:     100000,
+		Retention: 100000,
+		Limit:     1000000,
+		Interval:  500 * time.Millisecond,
 		Errors: func(err error) {
 			panic(err)
 		},
