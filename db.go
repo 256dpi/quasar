@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger"
 )
 
 // DB is a generic database.
@@ -39,10 +39,8 @@ func OpenDB(directory string, config DBConfig) (*DB, func(), error) {
 	}
 
 	// prepare options
-	bo := badger.DefaultOptions
-	bo.Dir = directory
-	bo.ValueDir = directory
-	bo.Logger = nil
+	bo := badger.DefaultOptions(directory).
+		WithLogger(nil)
 
 	// set logger if available
 	if config.LogSink != nil {

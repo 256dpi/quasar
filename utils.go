@@ -1,6 +1,6 @@
 package quasar
 
-import "github.com/dgraph-io/badger/v2"
+import "github.com/dgraph-io/badger"
 
 const maxTransactionRetries = 10
 
