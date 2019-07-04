@@ -24,11 +24,11 @@ var mutex sync.Mutex
 
 const batch = 1000
 
-func producer(ledger *quasar.Ledger, done <-chan struct{}) {
+func producer(queue *quasar.Queue, done <-chan struct{}) {
 	defer wg.Done()
 
 	// create producer
-	producer := quasar.NewProducer(ledger, quasar.ProducerConfig{
+	producer := queue.Producer(quasar.ProducerConfig{
 		Batch:   batch,
 		Timeout: time.Millisecond,
 		Retry:   100,
@@ -45,7 +45,7 @@ func producer(ledger *quasar.Ledger, done <-chan struct{}) {
 			Sequence: quasar.GenerateSequence(1),
 			Payload:  []byte(time.Now().Format(time.RFC3339Nano)),
 		}, func(err error) {
-			if err != nil {
+			if err != nil && err != quasar.ErrProducerClosed {
 				panic(err)
 			}
 		})
@@ -64,7 +64,7 @@ func producer(ledger *quasar.Ledger, done <-chan struct{}) {
 	}
 }
 
-func consumer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
+func consumer(queue *quasar.Queue, done <-chan struct{}) {
 	defer wg.Done()
 
 	// prepare channels
@@ -72,7 +72,7 @@ func consumer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) 
 	errors := make(chan error, 1)
 
 	// create consumer
-	consumer := quasar.NewConsumer(ledger, table, quasar.ConsumerConfig{
+	consumer := queue.Consumer(quasar.ConsumerConfig{
 		Name:    "example",
 		Entries: entries,
 		Errors:  errors,
@@ -114,7 +114,7 @@ func consumer(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) 
 	}
 }
 
-func printer(ledger *quasar.Ledger, done <-chan struct{}) {
+func printer(queue *quasar.Queue, done <-chan struct{}) {
 	defer wg.Done()
 
 	// create ticker
@@ -155,33 +155,7 @@ func printer(ledger *quasar.Ledger, done <-chan struct{}) {
 		fmt.Printf("p95: %.2fms, ", p95)
 		fmt.Printf("p99: %.2fms, ", p99)
 		fmt.Printf("max: %.2fms, ", max)
-		fmt.Printf("length: %d\n", ledger.Length())
-	}
-}
-
-func cleaner(ledger *quasar.Ledger, table *quasar.Table, done <-chan struct{}) {
-	defer wg.Done()
-
-	// prepare channels
-	errors := make(chan error, 1)
-
-	// create cleaner
-	cleaner := quasar.NewCleaner(ledger, quasar.CleanerConfig{
-		Retention: 10000,
-		Tables:    []*quasar.Table{table},
-		Interval:  100 * time.Millisecond,
-		Errors:    errors,
-	})
-
-	// ensure closing
-	defer cleaner.Close()
-
-	// wait for close
-	select {
-	case err := <-errors:
-		panic(err)
-	case <-done:
-		return
+		fmt.Printf("length: %d\n", queue.Ledger().Length())
 	}
 }
 
@@ -208,33 +182,39 @@ func main() {
 	}
 	defer closer()
 
-	// open ledger
-	ledger, err := quasar.CreateLedger(db, quasar.LedgerConfig{
-		Prefix: "ledger",
-		Cache:  batch * 10,
-		Limit:  batch * 1000,
-	})
-	if err != nil {
-		panic(err)
-	}
+	// panic on error
+	errors := make(chan error, 100)
+	go func() {
+		for err := range errors {
+			if err != nil {
+				panic(err)
+			}
+		}
+	}()
+	defer close(errors)
 
-	// open table
-	table, err := quasar.CreateTable(db, quasar.TableConfig{
-		Prefix: "table",
+	// create queue
+	queue, err := quasar.CreateQueue(db, quasar.QueueConfig{
+		Prefix:    "queue",
+		Cache:     batch * 10,
+		Retention: 10000,
+		Limit:     batch * 1000,
+		Interval:  100 * time.Millisecond,
+		Errors:    errors,
 	})
 	if err != nil {
 		panic(err)
 	}
+	defer queue.Close()
 
 	// create control channel
 	done := make(chan struct{})
 
 	// run routines
-	wg.Add(4)
-	go producer(ledger, done)
-	go consumer(ledger, table, done)
-	go cleaner(ledger, table, done)
-	go printer(ledger, done)
+	wg.Add(3)
+	go producer(queue, done)
+	go consumer(queue, done)
+	go printer(queue, done)
 
 	// prepare exit
 	exit := make(chan os.Signal, 1)
