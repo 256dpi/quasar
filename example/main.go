@@ -24,9 +24,7 @@ var mutex sync.Mutex
 
 const batch = 1000
 
-func producer(queue *quasar.Queue, done <-chan struct{}) {
-	defer wg.Done()
-
+func producer(queue *quasar.Queue) {
 	// create producer
 	producer := queue.Producer(quasar.ProducerConfig{
 		Batch:   batch,
@@ -54,19 +52,10 @@ func producer(queue *quasar.Queue, done <-chan struct{}) {
 		mutex.Lock()
 		send += 1
 		mutex.Unlock()
-
-		// limit rate
-		select {
-		default:
-		case <-done:
-			return
-		}
 	}
 }
 
-func consumer(queue *quasar.Queue, done <-chan struct{}) {
-	defer wg.Done()
-
+func consumer(queue *quasar.Queue) {
 	// prepare channels
 	entries := make(chan quasar.Entry, batch)
 	errors := make(chan error, 1)
@@ -93,8 +82,6 @@ func consumer(queue *quasar.Queue, done <-chan struct{}) {
 		case entry = <-entries:
 		case err := <-errors:
 			panic(err)
-		case <-done:
-			return
 		}
 
 		// get timestamp
@@ -114,7 +101,7 @@ func consumer(queue *quasar.Queue, done <-chan struct{}) {
 	}
 }
 
-func printer(queue *quasar.Queue, done <-chan struct{}) {
+func printer(queue *quasar.Queue) {
 	defer wg.Done()
 
 	// create ticker
@@ -122,11 +109,7 @@ func printer(queue *quasar.Queue, done <-chan struct{}) {
 
 	for {
 		// await signal
-		select {
-		case <-ticker:
-		case <-done:
-			return
-		}
+		<-ticker
 
 		// get data
 		mutex.Lock()
@@ -176,11 +159,10 @@ func main() {
 	}
 
 	// open db
-	db, closer, err := quasar.OpenDB(dir, quasar.DBConfig{GCInterval: 10 * time.Second})
+	db, _, err := quasar.OpenDB(dir, quasar.DBConfig{GCInterval: 10 * time.Second})
 	if err != nil {
 		panic(err)
 	}
-	defer closer()
 
 	// panic on error
 	errors := make(chan error, 100)
@@ -191,7 +173,6 @@ func main() {
 			}
 		}
 	}()
-	defer close(errors)
 
 	// create queue
 	queue, err := quasar.CreateQueue(db, quasar.QueueConfig{
@@ -205,29 +186,18 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer queue.Close()
-
-	// create control channel
-	done := make(chan struct{})
 
 	// run routines
 	wg.Add(3)
-	go producer(queue, done)
-	go consumer(queue, done)
-	go printer(queue, done)
+	go producer(queue)
+	go consumer(queue)
+	go printer(queue)
 
 	// prepare exit
 	exit := make(chan os.Signal, 1)
 	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM)
 	<-exit
 
-	// close control channel
-	close(done)
-	wg.Wait()
-
-	// close db
-	err = db.Close()
-	if err != nil {
-		panic(err)
-	}
+	// just exit
+	os.Exit(0)
 }
