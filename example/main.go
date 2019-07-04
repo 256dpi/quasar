@@ -43,7 +43,7 @@ func producer(queue *quasar.Queue) {
 			Sequence: quasar.GenerateSequence(1),
 			Payload:  []byte(time.Now().Format(time.RFC3339Nano)),
 		}, func(err error) {
-			if err != nil && err != quasar.ErrProducerClosed {
+			if err != nil {
 				panic(err)
 			}
 		})
