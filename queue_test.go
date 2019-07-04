@@ -10,22 +10,15 @@ import (
 func TestQueue(t *testing.T) {
 	db := openDB(true)
 
-	errors := make(chan error, 100)
-	go func() {
-		for err := range errors {
-			if err != nil {
-				panic(err)
-			}
-		}
-	}()
-
 	queue, err := CreateQueue(db, QueueConfig{
 		Prefix:    "queue",
 		Cache:     10,
 		Retention: 20,
 		Limit:     30,
 		Interval:  5 * time.Millisecond,
-		Errors:    errors,
+		Errors: func(err error) {
+			panic(err)
+		},
 	})
 	assert.NoError(t, err)
 
@@ -34,9 +27,11 @@ func TestQueue(t *testing.T) {
 	consumer := queue.Consumer(ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
-		Errors:  errors,
-		Batch:   10,
-		Window:  10,
+		Errors: func(err error) {
+			panic(err)
+		},
+		Batch:  10,
+		Window: 10,
 	})
 
 	time.Sleep(50 * time.Millisecond)
@@ -50,10 +45,12 @@ func TestQueue(t *testing.T) {
 
 	done := make(chan struct{})
 
-	go func(){
+	go func() {
 		for i := 1; i <= 50; i++ {
 			ok := producer.Write(Entry{Sequence: uint64(i), Payload: []byte("foo")}, func(err error) {
-				errors <- err
+				if err != nil {
+					panic(err)
+				}
 			})
 			assert.True(t, ok)
 		}
@@ -67,7 +64,9 @@ func TestQueue(t *testing.T) {
 		assert.Equal(t, uint64(i), entry.Sequence)
 
 		consumer.Mark(entry.Sequence, true, func(err error) {
-			errors <- err
+			if err != nil {
+				panic(err)
+			}
 		})
 
 		if i == 25 {
@@ -97,6 +96,4 @@ func TestQueue(t *testing.T) {
 	assert.Equal(t, 25, int(high))
 
 	queue.Close()
-
-	close(errors)
 }

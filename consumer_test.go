@@ -27,13 +27,14 @@ func TestConsumer(t *testing.T) {
 
 	counter := 0
 	entries := make(chan Entry, 10)
-	errors := make(chan error, 10)
 
 	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
-		Errors:  errors,
-		Batch:   10,
+		Errors: func(err error) {
+			panic(err)
+		},
+		Batch: 10,
 	})
 
 	for {
@@ -55,15 +56,16 @@ func TestConsumer(t *testing.T) {
 	}
 
 	consumer.Close()
-	assert.Empty(t, errors)
 
 	entries = make(chan Entry, 10)
 
 	consumer = NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
-		Errors:  errors,
-		Batch:   10,
+		Errors: func(err error) {
+			panic(err)
+		},
+		Batch: 10,
 	})
 
 	for {
@@ -85,7 +87,6 @@ func TestConsumer(t *testing.T) {
 	}
 
 	consumer.Close()
-	assert.Empty(t, errors)
 
 	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
@@ -114,14 +115,15 @@ func TestConsumerWindow(t *testing.T) {
 
 	counter := 0
 	entries := make(chan Entry, 1)
-	errors := make(chan error, 1)
 
 	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
-		Errors:  errors,
-		Batch:   5,
-		Window:  10,
+		Errors: func(err error) {
+			panic(err)
+		},
+		Batch:  5,
+		Window: 10,
 	})
 
 	for {
@@ -143,16 +145,17 @@ func TestConsumerWindow(t *testing.T) {
 	}
 
 	consumer.Close()
-	assert.Empty(t, errors)
 
 	entries = make(chan Entry, 10)
 
 	consumer = NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
-		Errors:  errors,
-		Batch:   5,
-		Window:  10,
+		Errors: func(err error) {
+			panic(err)
+		},
+		Batch:  5,
+		Window: 10,
 	})
 
 	for {
@@ -174,7 +177,6 @@ func TestConsumerWindow(t *testing.T) {
 	}
 
 	consumer.Close()
-	assert.Empty(t, errors)
 
 	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
@@ -203,14 +205,15 @@ func TestConsumerCumulativeMarks(t *testing.T) {
 
 	counter := 0
 	entries := make(chan Entry, 10)
-	errors := make(chan error, 10)
 
 	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
-		Errors:  errors,
-		Batch:   10,
-		Window:  20,
+		Errors: func(err error) {
+			panic(err)
+		},
+		Batch:  10,
+		Window: 20,
 	})
 
 	for {
@@ -234,7 +237,6 @@ func TestConsumerCumulativeMarks(t *testing.T) {
 	}
 
 	consumer.Close()
-	assert.Empty(t, errors)
 
 	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
@@ -260,13 +262,14 @@ func TestConsumerTemporary(t *testing.T) {
 
 	counter := 0
 	entries := make(chan Entry, 1)
-	errors := make(chan error, 1)
 
-	reader := NewConsumer(ledger, nil, ConsumerConfig{
+	consumer := NewConsumer(ledger, nil, ConsumerConfig{
 		Start:   0,
 		Entries: entries,
-		Errors:  errors,
-		Batch:   10,
+		Errors: func(err error) {
+			panic(err)
+		},
+		Batch: 10,
 	})
 
 	var next uint64
@@ -285,16 +288,17 @@ func TestConsumerTemporary(t *testing.T) {
 		}
 	}
 
-	reader.Close()
-	assert.Empty(t, errors)
+	consumer.Close()
 
 	entries = make(chan Entry, 10)
 
-	reader = NewConsumer(ledger, nil, ConsumerConfig{
+	consumer = NewConsumer(ledger, nil, ConsumerConfig{
 		Start:   next,
 		Entries: entries,
-		Errors:  errors,
-		Batch:   10,
+		Errors: func(err error) {
+			panic(err)
+		},
+		Batch: 10,
 	})
 
 	for {
@@ -309,8 +313,7 @@ func TestConsumerTemporary(t *testing.T) {
 		}
 	}
 
-	reader.Close()
-	assert.Empty(t, errors)
+	consumer.Close()
 
 	err = db.Close()
 	assert.NoError(t, err)
@@ -334,15 +337,16 @@ func TestConsumerUnorderedMarks(t *testing.T) {
 	}
 
 	entries := make(chan Entry, 1)
-	errors := make(chan error, 1)
 	signal := make(chan struct{}, 100)
 
 	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
-		Errors:  errors,
-		Batch:   5,
-		Window:  10,
+		Errors: func(err error) {
+			panic(err)
+		},
+		Batch:  5,
+		Window: 10,
 	})
 
 	for i := 0; i < 5; i++ {
@@ -380,7 +384,6 @@ func TestConsumerUnorderedMarks(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	consumer.Close()
-	assert.Empty(t, errors)
 
 	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
@@ -400,14 +403,15 @@ func TestConsumerSlowLedger(t *testing.T) {
 	assert.NoError(t, err)
 
 	entries := make(chan Entry, 1)
-	errors := make(chan error, 1)
 
 	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
-		Errors:  errors,
-		Batch:   5,
-		Window:  10,
+		Errors: func(err error) {
+			panic(err)
+		},
+		Batch:  5,
+		Window: 10,
 	})
 
 	go func() {
@@ -443,7 +447,6 @@ func TestConsumerSlowLedger(t *testing.T) {
 	}
 
 	consumer.Close()
-	assert.Empty(t, errors)
 
 	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
@@ -471,15 +474,16 @@ func TestConsumerSkipMark(t *testing.T) {
 	}
 
 	entries := make(chan Entry, 1)
-	errors := make(chan error, 1)
 
 	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
-		Errors:  errors,
-		Batch:   5,
-		Window:  10,
-		Skip:    2,
+		Errors: func(err error) {
+			panic(err)
+		},
+		Batch:  5,
+		Window: 10,
+		Skip:   2,
 	})
 
 	entry := <-entries
@@ -535,7 +539,6 @@ func TestConsumerSkipMark(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	consumer.Close()
-	assert.Empty(t, errors)
 
 	sequences, err = table.Get("foo")
 	assert.NoError(t, err)
@@ -564,14 +567,15 @@ func TestConsumerUnblock(t *testing.T) {
 	assert.NoError(t, err)
 
 	entries := make(chan Entry, 1)
-	errors := make(chan error, 1)
 
 	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
-		Errors:  errors,
-		Batch:   1,
-		Window:  10,
+		Errors: func(err error) {
+			panic(err)
+		},
+		Batch:  1,
+		Window: 10,
 	})
 
 	err = ledger.Write(Entry{
@@ -585,7 +589,6 @@ func TestConsumerUnblock(t *testing.T) {
 	assert.Equal(t, []byte("foo"), entry.Payload)
 
 	consumer.Close()
-	assert.Empty(t, errors)
 
 	err = db.Close()
 	assert.NoError(t, err)
@@ -610,13 +613,14 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 
 	counter := 0
 	entries := make(chan Entry, 1)
-	errors := make(chan error, 1)
 
 	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
-		Errors:  errors,
-		Batch:   10,
+		Errors: func(err error) {
+			panic(err)
+		},
+		Batch: 10,
 	})
 
 	for {
@@ -638,7 +642,6 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 	}
 
 	consumer.Close()
-	assert.Empty(t, errors)
 
 	position, err := table.Get("foo")
 	assert.NoError(t, err)
@@ -654,8 +657,10 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 	consumer = NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: entries,
-		Errors:  errors,
-		Batch:   10,
+		Errors: func(err error) {
+			panic(err)
+		},
+		Batch: 10,
 	})
 
 	for {
@@ -677,7 +682,6 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 	}
 
 	consumer.Close()
-	assert.Empty(t, errors)
 
 	position, err = table.Get("foo")
 	assert.NoError(t, err)
@@ -701,9 +705,11 @@ func TestConsumerInvalidSequence(t *testing.T) {
 	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: make(chan Entry, 1),
-		Errors:  errors,
-		Batch:   1,
-		Window:  10,
+		Errors: func(err error) {
+			errors <- err
+		},
+		Batch:  1,
+		Window: 10,
 	})
 
 	err = ledger.Write(Entry{

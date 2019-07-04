@@ -27,8 +27,8 @@ type ConsumerConfig struct {
 	// The channel on which entries are sent.
 	Entries chan<- Entry
 
-	// The channel on which errors are sent.
-	Errors chan<- error
+	// The callback that is called with errors before the consumer dies.
+	Errors func(error)
 
 	// The amount of entries to fetch from the ledger at once.
 	Batch int
@@ -63,11 +63,6 @@ func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer 
 	// check entries channel
 	if config.Entries == nil {
 		panic("quasar: missing entries channel")
-	}
-
-	// check errors channel
-	if config.Errors == nil {
-		panic("quasar: missing errors channel")
 	}
 
 	// set default batch
@@ -150,12 +145,7 @@ func (c *Consumer) reader() error {
 		// read entries
 		entries, err := c.ledger.Read(position, c.config.Batch)
 		if err != nil {
-			select {
-			case c.config.Errors <- err:
-			default:
-			}
-
-			return err
+			return c.die(err)
 		}
 
 		// put entries on pipe
@@ -179,12 +169,7 @@ func (c *Consumer) worker() error {
 		// fetch stored markers
 		markers, err := c.table.Get(c.config.Name)
 		if err != nil {
-			select {
-			case c.config.Errors <- err:
-			default:
-			}
-
-			return err
+			return c.die(err)
 		}
 
 		// check if markers haven been recovered
@@ -195,12 +180,7 @@ func (c *Consumer) worker() error {
 			// store provided initial start sequence in table
 			err := c.table.Set(c.config.Name, []uint64{c.start})
 			if err != nil {
-				select {
-				case c.config.Errors <- err:
-				default:
-				}
-
-				return err
+				return c.die(err)
 			}
 		}
 
@@ -234,12 +214,7 @@ func (c *Consumer) worker() error {
 				// store markers in table
 				err := c.table.Set(c.config.Name, list)
 				if err != nil {
-					select {
-					case c.config.Errors <- err:
-					default:
-					}
-
-					return err
+					return c.die(err)
 				}
 			}
 
@@ -313,18 +288,12 @@ func (c *Consumer) worker() error {
 			// check sequence
 			_, ok := markers[tuple.seq]
 			if !ok {
-				// push error
-				select {
-				case c.config.Errors <- ErrInvalidSequence:
-				default:
-				}
-
 				// call ack
 				if tuple.ack != nil {
 					tuple.ack(ErrInvalidSequence)
 				}
 
-				return ErrInvalidSequence
+				return c.die(ErrInvalidSequence)
 			}
 
 			// check if mark is cumulative
@@ -365,18 +334,12 @@ func (c *Consumer) worker() error {
 			// store markers in table
 			err := c.table.Set(c.config.Name, list)
 			if err != nil {
-				// push error
-				select {
-				case c.config.Errors <- err:
-				default:
-				}
-
 				// call ack
 				if tuple.ack != nil {
 					tuple.ack(err)
 				}
 
-				return err
+				return c.die(err)
 			}
 
 			// compress markers
@@ -393,4 +356,13 @@ func (c *Consumer) worker() error {
 		case <-c.tomb.Dying():
 		}
 	}
+}
+
+func (c *Consumer) die(err error) error {
+	// call error callback if present and error given
+	if err != nil && c.config.Errors != nil {
+		c.config.Errors(err)
+	}
+
+	return err
 }

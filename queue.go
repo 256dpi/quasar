@@ -25,8 +25,8 @@ type QueueConfig struct {
 	// The interval of periodic cleanings.
 	Interval time.Duration
 
-	// The channel on which cleaning errors are sent.
-	Errors chan<- error
+	// The callback used to yield cleaner errors.
+	Errors func(error)
 }
 
 // Queue is a managed ledger and table with a cleaner.

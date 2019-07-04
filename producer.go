@@ -8,7 +8,7 @@ import (
 	"gopkg.in/tomb.v2"
 )
 
-// ErrProducerCloses is yielded to callbacks if the producer has been closed.
+// ErrProducerClosed is yielded to callbacks if the producer has been closed.
 var ErrProducerClosed = errors.New("producer closed")
 
 type tuple struct {

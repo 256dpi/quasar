@@ -58,31 +58,25 @@ func producer(queue *quasar.Queue) {
 func consumer(queue *quasar.Queue) {
 	// prepare channels
 	entries := make(chan quasar.Entry, batch)
-	errors := make(chan error, 1)
 
 	// create consumer
 	consumer := queue.Consumer(quasar.ConsumerConfig{
 		Name:    "example",
 		Entries: entries,
-		Errors:  errors,
-		Batch:   batch,
-		Window:  batch * 2,
-		Skip:    batch,
+		Errors: func(err error) {
+			panic(err)
+		},
+		Batch:  batch,
+		Window: batch * 2,
+		Skip:   batch,
 	})
 
 	// ensure closing
 	defer consumer.Close()
 
 	for {
-		// prepare entry
-		var entry quasar.Entry
-
-		// receive entry or error
-		select {
-		case entry = <-entries:
-		case err := <-errors:
-			panic(err)
-		}
+		// receive entry
+		entry := <-entries
 
 		// get timestamp
 		ts, _ := time.Parse(time.RFC3339Nano, string(entry.Payload))
@@ -164,16 +158,6 @@ func main() {
 		panic(err)
 	}
 
-	// panic on error
-	errors := make(chan error, 100)
-	go func() {
-		for err := range errors {
-			if err != nil {
-				panic(err)
-			}
-		}
-	}()
-
 	// create queue
 	queue, err := quasar.CreateQueue(db, quasar.QueueConfig{
 		Prefix:    "queue",
@@ -181,7 +165,9 @@ func main() {
 		Retention: 10000,
 		Limit:     batch * 1000,
 		Interval:  100 * time.Millisecond,
-		Errors:    errors,
+		Errors: func(err error) {
+			panic(err)
+		},
 	})
 	if err != nil {
 		panic(err)

@@ -20,8 +20,8 @@ type CleanerConfig struct {
 	// The matrices to check for minimal positions.
 	Tables []*Table
 
-	// The channel on which errors are sent.
-	Errors chan<- error
+	// The callback used to yield errors.
+	Errors func(error)
 }
 
 // Cleaner will periodically delete entries from a ledger honoring the configured
@@ -71,10 +71,7 @@ func (c *Cleaner) worker() error {
 		// perform clean
 		err := c.clean()
 		if err != nil && c.config.Errors != nil {
-			select {
-			case c.config.Errors <- err:
-			default:
-			}
+			c.config.Errors(err)
 		}
 	}
 }
