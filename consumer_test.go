@@ -700,13 +700,11 @@ func TestConsumerInvalidSequence(t *testing.T) {
 	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
-	errors := make(chan error, 1)
-
 	consumer := NewConsumer(ledger, table, ConsumerConfig{
 		Name:    "foo",
 		Entries: make(chan Entry, 1),
 		Errors: func(err error) {
-			errors <- err
+			panic(err)
 		},
 		Batch:  1,
 		Window: 10,
@@ -724,11 +722,7 @@ func TestConsumerInvalidSequence(t *testing.T) {
 	})
 	assert.Equal(t, ErrInvalidSequence, <-ret)
 
-	err = <-errors
-	assert.Equal(t, ErrInvalidSequence, err)
-
 	consumer.Close()
-	assert.Empty(t, errors)
 
 	err = db.Close()
 	assert.NoError(t, err)

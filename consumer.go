@@ -293,7 +293,7 @@ func (c *Consumer) worker() error {
 					tuple.ack(ErrInvalidSequence)
 				}
 
-				return c.die(ErrInvalidSequence)
+				continue
 			}
 
 			// check if mark is cumulative
