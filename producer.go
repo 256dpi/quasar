@@ -192,7 +192,7 @@ func (p *Producer) worker() error {
 				err = p.ledger.Write(entries...)
 
 				// break if write succeeded
-				if err == nil {
+				if err != ErrLimitReached {
 					break
 				}
 			}
