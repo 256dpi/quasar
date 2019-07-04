@@ -87,26 +87,38 @@ func TestTableRange(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
-	min, max, err := table.Range()
+	min, max, ok, err := table.Range()
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(0), min)
 	assert.Equal(t, uint64(0), max)
+	assert.False(t, ok)
+
+	err = table.Set("foo", []uint64{0})
+	assert.NoError(t, err)
+
+	min, max, ok, err = table.Range()
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0), min)
+	assert.Equal(t, uint64(0), max)
+	assert.True(t, ok)
 
 	err = table.Set("foo", []uint64{7})
 	assert.NoError(t, err)
 
-	min, max, err = table.Range()
+	min, max, ok, err = table.Range()
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(7), min)
 	assert.Equal(t, uint64(7), max)
+	assert.True(t, ok)
 
 	err = table.Set("bar", []uint64{5, 13})
 	assert.NoError(t, err)
 
-	min, max, err = table.Range()
+	min, max, ok, err = table.Range()
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(5), min)
 	assert.Equal(t, uint64(13), max)
+	assert.True(t, ok)
 
 	err = db.Close()
 	assert.NoError(t, err)

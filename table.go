@@ -126,10 +126,14 @@ func (m *Table) Count() (int, error) {
 	return counter, nil
 }
 
-// Range will return the range of stored positions.
-func (m *Table) Range() (uint64, uint64, error) {
+// Range will return the range of stored positions and whether there are any
+// store positions at all.
+func (m *Table) Range() (uint64, uint64, bool, error) {
 	// prepare counter
 	var min, max uint64
+
+	// prepare flag
+	var found bool
 
 	// iterate over all keys
 	err := m.db.View(func(txn *badger.Txn) error {
@@ -175,15 +179,18 @@ func (m *Table) Range() (uint64, uint64, error) {
 			if max == 0 || sequences[len(sequences)-1] > max {
 				max = sequences[len(sequences)-1]
 			}
+
+			// set flag
+			found = true
 		}
 
 		return nil
 	})
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, false, err
 	}
 
-	return min, max, nil
+	return min, max, found, nil
 }
 
 // Clear will drop all table entries. Clear will temporarily block concurrent
