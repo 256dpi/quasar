@@ -127,7 +127,7 @@ func (m *Table) Count() (int, error) {
 }
 
 // Range will return the range of stored positions and whether there are any
-// store positions at all.
+// stored positions at all.
 func (m *Table) Range() (uint64, uint64, bool, error) {
 	// prepare counter
 	var min, max uint64
