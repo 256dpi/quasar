@@ -105,6 +105,33 @@ func TestProducerFilter(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestProducerCancel(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	assert.NoError(t, err)
+
+	done := make(chan struct{})
+
+	producer := NewProducer(ledger, ProducerConfig{
+		Batch:   10,
+		Timeout: time.Second,
+	})
+
+	ok := producer.Write(Entry{Sequence: 1, Payload: []byte("foo")}, func(err error) {
+		assert.Error(t, err)
+		close(done)
+	})
+	assert.True(t, ok)
+
+	producer.Close()
+
+	<-done
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func TestProducerRetry(t *testing.T) {
 	db := openDB(true)
 

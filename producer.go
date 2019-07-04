@@ -1,11 +1,15 @@
 package quasar
 
 import (
+	"errors"
 	"sync"
 	"time"
 
 	"gopkg.in/tomb.v2"
 )
+
+// ErrProducerCloses is yielded to callbacks if the producer has been closed.
+var ErrProducerClosed = errors.New("producer closed")
 
 type tuple struct {
 	entry Entry
@@ -68,8 +72,9 @@ func NewProducer(ledger *Ledger, config ProducerConfig) *Producer {
 }
 
 // Write will asynchronously write the specified message and call the provided
-// callback with the result. If no error is present the operation was
-// successful.
+// callback with the result. The method returns whether the entry has been
+// accepted and that the ack, if present, will be called with the result of the
+// operation.
 func (p *Producer) Write(entry Entry, ack func(error)) bool {
 	// check if closed
 	if !p.tomb.Alive() {
@@ -95,7 +100,8 @@ func (p *Producer) Write(entry Entry, ack func(error)) bool {
 	}
 }
 
-// Close will close the producer.
+// Close will close the producer. Unprocessed entries will be canceled and the
+// callbacks receive ErrProducerClosed if available.
 func (p *Producer) Close() {
 	// kill tomb
 	p.tomb.Kill(nil)
@@ -112,11 +118,24 @@ func (p *Producer) Close() {
 }
 
 func (p *Producer) worker() error {
-	for {
-		// prepare entries and acks
-		entries := make([]Entry, 0, p.config.Batch)
-		acks := make([]func(error), 0, p.config.Batch)
+	// prepare entries and acks
+	entries := make([]Entry, 0, p.config.Batch)
+	acks := make([]func(error), 0, p.config.Batch)
 
+	// set cleanup handler
+	defer func() {
+		// cancel batched tuples
+		for _, ack := range acks {
+			ack(ErrProducerClosed)
+		}
+
+		// cancel queued tuples
+		for tpl := range p.pipe {
+			tpl.ack(ErrProducerClosed)
+		}
+	}()
+
+	for {
 		// wait for first tuple
 		select {
 		case tpl, ok := <-p.pipe:
@@ -128,18 +147,20 @@ func (p *Producer) worker() error {
 			// add entry and ack
 			entries = append(entries, tpl.entry)
 			acks = append(acks, tpl.ack)
+		case <-p.tomb.Dying():
+			return tomb.ErrDying
 		}
 
 		// prepare timeout
-		tmt := time.After(p.config.Timeout)
+		timeout := time.After(p.config.Timeout)
 
-		// await next tuple or timeout
+		// get more tuples or timeout
 		for {
 			select {
 			case tpl, ok := <-p.pipe:
 				// stop if pipe has been closed
 				if !ok {
-					break
+					return tomb.ErrDying
 				}
 
 				// add entry and ack
@@ -150,7 +171,9 @@ func (p *Producer) worker() error {
 				if len(entries) < p.config.Batch {
 					continue
 				}
-			case <-tmt:
+			case <-timeout:
+			case <-p.tomb.Dying():
+				return tomb.ErrDying
 			}
 
 			// exit loop
@@ -183,26 +206,30 @@ func (p *Producer) worker() error {
 			for i := 0; i < p.config.Retry; i++ {
 				// wait for next interval or close
 				select {
+				case <-time.After(p.config.Delay):
 				case <-p.tomb.Dying():
 					return tomb.ErrDying
-				case <-time.After(p.config.Delay):
 				}
 
 				// attempt again to write entries
 				err = p.ledger.Write(entries...)
 
-				// break if write succeeded
+				// break if write succeeded or failed otherwise
 				if err != ErrLimitReached {
 					break
 				}
 			}
 		}
 
-		// call acks
+		// call acks with result
 		for _, ack := range acks {
 			if ack != nil {
 				ack(err)
 			}
 		}
+
+		// reset lists
+		entries = make([]Entry, 0, p.config.Batch)
+		acks = make([]func(error), 0, p.config.Batch)
 	}
 }
