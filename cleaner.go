@@ -24,9 +24,9 @@ type CleanerConfig struct {
 	Errors chan<- error
 }
 
-// Cleaner will periodically delete entries from a ledger honoring min and max
-// retentions and positions from matrices. Failed cleanings are retried
-// and the errors are sent on the supplied channel.
+// Cleaner will periodically delete entries from a ledger honoring the configured
+// retention and threshold as well as positions from the specified tables. Failed
+// cleanings are retried and the errors are sent on the supplied channel.
 type Cleaner struct {
 	ledger *Ledger
 	config CleanerConfig
@@ -97,8 +97,7 @@ func (c *Cleaner) clean() error {
 	}
 
 	// prefetch threshold position. this will make sure that we properly honor
-	// the low positions of matrices if a lot of entries are written
-	// during the cleaning
+	// the positions of tables if a lot of entries are written during the cleaning
 	var threshold uint64
 	if c.config.Threshold > 0 {
 		// get threshold position
@@ -134,7 +133,7 @@ func (c *Cleaner) clean() error {
 		}
 	}
 
-	// delete entries
+	// delete entries up to the calculated position
 	_, err = c.ledger.Delete(position)
 	if err != nil {
 		return err
