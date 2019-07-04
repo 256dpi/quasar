@@ -103,8 +103,10 @@ func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer 
 }
 
 // Mark will acknowledge and mark the consumption of the specified sequence. The
-// specified callback is called with the result of the processed mark. Skipped
-// marks will have their callback called right away.
+// specified callback is called with the result of the processed mark. If Skip
+// is configured the callback might called later once the mark will be persisted.
+// The method returns whether the mark has been successfully queued and its
+// callback will be called with the result or an error if the consumer is closed.
 func (c *Consumer) Mark(sequence uint64, cumulative bool, ack func(error)) bool {
 	// check if closed
 	if !c.tomb.Alive() {
