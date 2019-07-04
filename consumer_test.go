@@ -551,7 +551,7 @@ func TestConsumerSkipMark(t *testing.T) {
 
 	consumer.Close()
 
-	assert.Error(t, ErrConsumerClosed, <-ret4)
+	assert.NoError(t, <-ret4)
 
 	sequences, err = table.Get("foo")
 	assert.NoError(t, err)

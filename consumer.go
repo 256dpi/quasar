@@ -239,15 +239,6 @@ func (c *Consumer) worker() error {
 	// prepare skipped
 	var skipped []func(error)
 
-	// cancel skipped acks on exit
-	defer func() {
-		for _, ack := range skipped {
-			if ack != nil {
-				ack(ErrConsumerClosed)
-			}
-		}
-	}()
-
 	// prepare first flag
 	first := true
 
@@ -255,14 +246,18 @@ func (c *Consumer) worker() error {
 		// check if closed
 		if !c.tomb.Alive() {
 			// store potentially uncommitted markers if skip is enabled
-			if c.table != nil && c.config.Skip > 0 {
+			if c.table != nil && len(skipped) > 0 {
 				// compile markers
 				list := CompileSequences(markers)
 
 				// store markers in table
 				err := c.table.Set(c.config.Name, list)
-				if err != nil {
-					return c.die(err)
+
+				// call acks with result
+				for _, ack := range skipped {
+					if ack != nil {
+						ack(err)
+					}
 				}
 			}
 
