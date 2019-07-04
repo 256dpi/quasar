@@ -16,7 +16,7 @@ type tuple struct {
 	ack   func(error)
 }
 
-// ProducerConfig are used to configure a producer.
+// ProducerConfig is used to configure a producer.
 type ProducerConfig struct {
 	// The maximum size of the written entry batches.
 	Batch int

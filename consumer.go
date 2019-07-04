@@ -16,7 +16,7 @@ type markTuple struct {
 	ack func(error)
 }
 
-// ConsumerConfig are used to configure a consumer.
+// ConsumerConfig is used to configure a consumer.
 type ConsumerConfig struct {
 	// The name of the consumer.
 	Name string

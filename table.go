@@ -4,7 +4,7 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
-// TableConfig are used to configure a table.
+// TableConfig is used to configure a table.
 type TableConfig struct {
 	// The prefix for all table keys.
 	Prefix string

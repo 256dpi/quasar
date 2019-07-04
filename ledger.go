@@ -30,7 +30,7 @@ type Entry struct {
 	Object interface{}
 }
 
-// LedgerConfig are used to configure a ledger.
+// LedgerConfig is used to configure a ledger.
 type LedgerConfig struct {
 	// The prefix for all ledger keys.
 	Prefix string

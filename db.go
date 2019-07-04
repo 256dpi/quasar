@@ -12,7 +12,7 @@ import (
 // DB is a generic database.
 type DB = badger.DB
 
-// DBConfig are used to configure a DB.
+// DBConfig is used to configure a DB.
 type DBConfig struct {
 	// The interval of the garbage collector.
 	GCInterval time.Duration

@@ -6,7 +6,7 @@ import (
 	"gopkg.in/tomb.v2"
 )
 
-// CleanerConfig are used to configure a cleaner.
+// CleanerConfig is used to configure a cleaner.
 type CleanerConfig struct {
 	// The point to which entries are kept in any case.
 	Retention int
