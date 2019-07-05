@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger"
+	"gopkg.in/tomb.v2"
 )
 
 // DB is a generic database.
@@ -17,8 +18,8 @@ type DBConfig struct {
 	// The interval of the garbage collector.
 	GCInterval time.Duration
 
-	// The channel on which garbage collector errors are sent.
-	GCErrors chan<- error
+	// The callback that receives garbage collector errors.
+	GCErrors func(error)
 
 	// The sink used for logging.
 	LogSink io.Writer
@@ -53,37 +54,35 @@ func OpenDB(directory string, config DBConfig) (*DB, func(), error) {
 		return nil, nil, err
 	}
 
-	// prepare channel
-	done := make(chan struct{})
+	// prepare tomb
+	var tmb tomb.Tomb
 
 	// run gc routine if requested
 	if config.GCInterval > 0 {
-		go func() {
+		tmb.Go(func() error {
 			for {
 				// sleep some time
 				select {
 				case <-time.After(config.GCInterval):
-				case <-done:
-					return
+				case <-tmb.Dying():
+					return tomb.ErrDying
 				}
 
 				// run gc
 				err = db.RunValueLogGC(0.75)
 				if err == badger.ErrRejected {
-					return
+					continue
 				} else if err != nil && err != badger.ErrNoRewrite && config.GCErrors != nil {
-					select {
-					case config.GCErrors <- err:
-					default:
-					}
+					config.GCErrors(err)
 				}
 			}
-		}()
+		})
 	}
 
 	// create closer
 	closer := func() {
-		close(done)
+		tmb.Kill(nil)
+		_ = tmb.Wait()
 	}
 
 	return db, closer, nil
