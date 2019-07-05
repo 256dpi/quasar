@@ -315,7 +315,7 @@ func (c *Consumer) worker() error {
 			// restore stored markers that are newer or equal to first entry
 			if first {
 				for _, seq := range storedMarkers {
-					if seq >= dynEntry.Sequence {
+					if seq >= entry.Sequence {
 						markers[seq] = true
 					}
 				}
@@ -325,7 +325,7 @@ func (c *Consumer) worker() error {
 			}
 
 			// skip already processed entry
-			if ok, _ := markers[dynEntry.Sequence]; ok {
+			if ok, _ := markers[entry.Sequence]; ok {
 				continue
 			}
 
