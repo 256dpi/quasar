@@ -8,16 +8,16 @@ import (
 
 // CleanerConfig is used to configure a cleaner.
 type CleanerConfig struct {
-	// The point to which entries are kept in any case.
+	// The amount of entries to keep available in the ledger.
 	Retention int
 
-	// The point after which entries are dropped no matter what.
+	// The maximum amount of entries to keep in the ledger.
 	Threshold int
 
 	// The interval of cleanings.
 	Interval time.Duration
 
-	// The matrices to check for minimal positions.
+	// The tables to check for positions.
 	Tables []*Table
 
 	// The callback used to yield errors.
@@ -26,7 +26,7 @@ type CleanerConfig struct {
 
 // Cleaner will periodically delete entries from a ledger honoring the configured
 // retention and threshold as well as positions from the specified tables. Failed
-// cleanings are retried and the errors are sent on the supplied channel.
+// cleanings are retried and the errors yielded to the configured callback.
 type Cleaner struct {
 	ledger *Ledger
 	config CleanerConfig

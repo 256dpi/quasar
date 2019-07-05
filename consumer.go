@@ -8,7 +8,7 @@ import (
 	"gopkg.in/tomb.v2"
 )
 
-// ErrInvalidSequence is returned if Mark() is called with a sequences that has
+// ErrInvalidSequence is yielded to callbacks if the provided sequences that has
 // not yet been processed by the consumer.
 var ErrInvalidSequence = errors.New("invalid sequence")
 
@@ -19,7 +19,7 @@ var ErrConsumerClosed = errors.New("consumer closed")
 // been reached.
 var ErrConsumerTimeout = errors.New("consumer timeout")
 
-type markTuple struct {
+type consumerTuple struct {
 	seq uint64
 	cum bool
 	ack func(error)
@@ -27,13 +27,14 @@ type markTuple struct {
 
 // ConsumerConfig is used to configure a consumer.
 type ConsumerConfig struct {
-	// The name of the persistent consumer.
+	// The name of the persistent consumer. If empty, the consumer will not
+	// persist its positions.
 	Name string
 
 	// The start position of the consumer if not recovered from the table.
 	Start uint64
 
-	// The channel on which entries are sent.
+	// The channel on which available entries are sent.
 	Entries chan<- Entry
 
 	// The callback that is called with errors before the consumer dies.
@@ -42,25 +43,23 @@ type ConsumerConfig struct {
 	// The amount of entries to fetch from the ledger at once.
 	Batch int
 
-	// The maximal size of the unprocessed sequence range.
+	// The maximal size of the unmarked sequence range.
 	Window int
 
 	// The number of acks to skip before sequences are written to the table.
 	Skip int
 
 	// The timeout after which the consumer crashes if it cannot make progress.
-	// This can be used to protect the consumer from deadlocks if an ack has
-	// been missed.
 	Timeout time.Duration
 }
 
-// Consumer manages consuming messages of a ledger using a sequence map.
+// Consumer manages consuming messages of a ledger.
 type Consumer struct {
 	ledger *Ledger
 	table  *Table
 	config ConsumerConfig
 
-	marks chan markTuple
+	marks chan consumerTuple
 	mutex sync.RWMutex
 	once  sync.Once
 
@@ -69,9 +68,7 @@ type Consumer struct {
 	tomb  tomb.Tomb
 }
 
-// NewConsumer will create and return a new consumer. If table is given, the
-// consumer will persists processed sequences according to the provided
-// configuration.
+// NewConsumer will create and return a new consumer.
 func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer {
 	// check table
 	if config.Name != "" && table == nil {
@@ -105,7 +102,7 @@ func NewConsumer(ledger *Ledger, table *Table, config ConsumerConfig) *Consumer 
 		config: config,
 		start:  config.Start,
 		pipe:   make(chan Entry, config.Batch),
-		marks:  make(chan markTuple, config.Window),
+		marks:  make(chan consumerTuple, config.Window),
 	}
 
 	// unset table if name is missing
@@ -131,7 +128,7 @@ func (c *Consumer) Mark(sequence uint64, cumulative bool, ack func(error)) bool 
 	}
 
 	// create tuple
-	tpl := markTuple{
+	tpl := consumerTuple{
 		seq: sequence,
 		cum: cumulative,
 		ack: ack,

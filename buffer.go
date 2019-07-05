@@ -13,7 +13,7 @@ type Buffer struct {
 	mutex sync.RWMutex
 }
 
-// NewBuffer creates and returns a new cache.
+// NewBuffer creates and returns a new buffer.
 func NewBuffer(size int) *Buffer {
 	return &Buffer{
 		size:  size,
@@ -57,7 +57,7 @@ func (b *Buffer) Scan(fn func(Entry) bool) {
 	}
 }
 
-// Trim will remove entries from the cache until false is returned.
+// Trim will remove entries from the buffer until false is returned.
 func (b *Buffer) Trim(fn func(Entry) bool) {
 	// acquire mutex
 	b.mutex.Lock()

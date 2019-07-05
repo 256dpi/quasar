@@ -11,7 +11,7 @@ import (
 // ErrProducerClosed is yielded to callbacks if the producer has been closed.
 var ErrProducerClosed = errors.New("producer closed")
 
-type tuple struct {
+type producerTuple struct {
 	entry Entry
 	ack   func(error)
 }
@@ -40,7 +40,7 @@ type ProducerConfig struct {
 type Producer struct {
 	ledger *Ledger
 	config ProducerConfig
-	pipe   chan tuple
+	pipe   chan producerTuple
 	mutex  sync.RWMutex
 	once   sync.Once
 	tomb   tomb.Tomb
@@ -62,7 +62,7 @@ func NewProducer(ledger *Ledger, config ProducerConfig) *Producer {
 	p := &Producer{
 		ledger: ledger,
 		config: config,
-		pipe:   make(chan tuple, config.Batch),
+		pipe:   make(chan producerTuple, config.Batch),
 	}
 
 	// run worker
@@ -82,7 +82,7 @@ func (p *Producer) Write(entry Entry, ack func(error)) bool {
 	}
 
 	// create tuple
-	tpl := tuple{
+	tpl := producerTuple{
 		entry: entry,
 		ack:   ack,
 	}
