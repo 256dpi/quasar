@@ -126,12 +126,16 @@ func (p *Producer) worker() error {
 	defer func() {
 		// cancel batched tuples
 		for _, ack := range acks {
-			ack(ErrProducerClosed)
+			if ack != nil {
+				ack(ErrProducerClosed)
+			}
 		}
 
 		// cancel queued tuples
 		for tpl := range p.pipe {
-			tpl.ack(ErrProducerClosed)
+			if tpl.ack != nil {
+				tpl.ack(ErrProducerClosed)
+			}
 		}
 	}()
 
