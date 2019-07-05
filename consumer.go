@@ -348,17 +348,16 @@ func (c *Consumer) worker() error {
 				continue
 			}
 
-			// check if mark is cumulative
+			// mark sequence
+			markers[tuple.seq] = true
+
+			// mark all lower sequences if cumulative
 			if tuple.cum {
-				// mark all sequences
 				for seq := range markers {
-					if seq <= tuple.seq {
+					if seq < tuple.seq {
 						markers[seq] = true
 					}
 				}
-			} else {
-				// mark single sequence
-				markers[tuple.seq] = true
 			}
 
 			// cache ack if skipping is enabled and there is space
