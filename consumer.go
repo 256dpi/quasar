@@ -49,12 +49,14 @@ type Consumer struct {
 	ledger *Ledger
 	table  *Table
 	config ConsumerConfig
-	start  uint64
-	pipe   chan Entry
-	marks  chan markTuple
-	mutex  sync.RWMutex
-	once   sync.Once
-	tomb   tomb.Tomb
+
+	marks chan markTuple
+	mutex sync.RWMutex
+	once  sync.Once
+
+	start uint64
+	pipe  chan Entry
+	tomb  tomb.Tomb
 }
 
 // NewConsumer will create and return a new consumer. If table is given, the
