@@ -177,8 +177,11 @@ func (c *Consumer) reader() error {
 			return tomb.ErrDying
 		}
 
+		// get current head
+		head := c.ledger.Head()
+
 		// wait for notification if no new data in ledger
-		if c.ledger.Head() < position {
+		if head < position || (head == 0 && position == 0) {
 			select {
 			case <-notifications:
 			case <-c.tomb.Dying():
