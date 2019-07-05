@@ -1,13 +1,22 @@
 package quasar
 
 import (
-	"io"
-	"log"
 	"os"
 	"time"
 
 	"github.com/dgraph-io/badger"
 	"gopkg.in/tomb.v2"
+)
+
+// Level specifies a log level.
+type Level int
+
+// The available log levels.
+const (
+	Error Level = iota
+	Warning
+	Info
+	Debug
 )
 
 // DB is a generic database.
@@ -22,7 +31,7 @@ type DBConfig struct {
 	GCErrors func(error)
 
 	// The sink used for logging.
-	LogSink io.Writer
+	Logger func(level Level, format string, args ...interface{})
 }
 
 // OpenDB will open or create the specified db. A function is returned that must
@@ -44,8 +53,8 @@ func OpenDB(directory string, config DBConfig) (*DB, func(), error) {
 		WithLogger(nil)
 
 	// set logger if available
-	if config.LogSink != nil {
-		bo.Logger = createLogger(config.LogSink)
+	if config.Logger != nil {
+		bo.Logger = createLogger(config.Logger)
 	}
 
 	// open db
@@ -89,27 +98,27 @@ func OpenDB(directory string, config DBConfig) (*DB, func(), error) {
 }
 
 type logger struct {
-	*log.Logger
+	sink func(Level, string, ...interface{})
 }
 
-func createLogger(sink io.Writer) *logger {
+func createLogger(sink func(Level, string, ...interface{})) *logger {
 	return &logger{
-		Logger: log.New(sink, "quasar ", log.LstdFlags),
+		sink: sink,
 	}
 }
 
 func (l *logger) Errorf(f string, v ...interface{}) {
-	l.Printf("ERROR: "+f, v...)
+	l.sink(Error, f, v...)
 }
 
 func (l *logger) Warningf(f string, v ...interface{}) {
-	l.Printf("WARNING: "+f, v...)
+	l.sink(Warning, f, v...)
 }
 
 func (l *logger) Infof(f string, v ...interface{}) {
-	l.Printf("INFO: "+f, v...)
+	l.sink(Info, f, v...)
 }
 
 func (l *logger) Debugf(f string, v ...interface{}) {
-	l.Printf("DEBUG: "+f, v...)
+	l.sink(Debug, f, v...)
 }

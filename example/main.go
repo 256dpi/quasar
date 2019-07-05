@@ -156,7 +156,12 @@ func main() {
 	}
 
 	// open db
-	db, _, err := quasar.OpenDB(dir, quasar.DBConfig{GCInterval: 10 * time.Second})
+	db, _, err := quasar.OpenDB(dir, quasar.DBConfig{
+		GCInterval: 10 * time.Second,
+		GCErrors: func(err error) {
+			panic(err)
+		},
+	})
 	if err != nil {
 		panic(err)
 	}
