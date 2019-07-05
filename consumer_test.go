@@ -251,6 +251,67 @@ func TestConsumerCumulativeMarks(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestConsumerMissedMark(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	assert.NoError(t, err)
+
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	assert.NoError(t, err)
+
+	for i := 1; i <= 100; i++ {
+		err = ledger.Write(Entry{
+			Sequence: uint64(i),
+			Payload:  []byte("foo"),
+		})
+		assert.NoError(t, err)
+	}
+
+	counter := 0
+	entries := make(chan Entry, 10)
+	errs := make(chan error, 1)
+
+	consumer := NewConsumer(ledger, table, ConsumerConfig{
+		Name:    "foo",
+		Entries: entries,
+		Errors: func(err error) {
+			errs <- err
+		},
+		Batch:   10,
+		Window:  20,
+		Timeout: 10 * time.Millisecond,
+	})
+
+	for {
+		counter++
+
+		entry := <-entries
+		assert.Equal(t, uint64(counter), entry.Sequence)
+		assert.Equal(t, []byte("foo"), entry.Payload)
+
+		if counter <= 5 {
+			consumer.Mark(entry.Sequence, false, nil)
+		}
+
+		if counter == 20 {
+			break
+		}
+	}
+
+	err = <-errs
+	assert.Equal(t, ErrConsumerTimeout, err)
+
+	consumer.Close()
+
+	sequences, err := table.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, []uint64{5}, sequences)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func TestConsumerTemporary(t *testing.T) {
 	db := openDB(true)
 

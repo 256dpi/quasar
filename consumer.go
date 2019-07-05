@@ -3,6 +3,7 @@ package quasar
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"gopkg.in/tomb.v2"
 )
@@ -13,6 +14,10 @@ var ErrInvalidSequence = errors.New("invalid sequence")
 
 // ErrConsumerClosed is yielded to callbacks if the consumer has been closed.
 var ErrConsumerClosed = errors.New("consumer closed")
+
+// ErrConsumerTimeout is returned by the consumer if the specified timeout has
+// been reached.
+var ErrConsumerTimeout = errors.New("consumer timeout")
 
 type markTuple struct {
 	seq uint64
@@ -42,6 +47,11 @@ type ConsumerConfig struct {
 
 	// The number of acks to skip before sequences are written to the table.
 	Skip int
+
+	// The timeout after which the consumer crashes if it cannot make progress.
+	// This can be used to protect the consumer from deadlocks if an ack has
+	// been missed.
+	Timeout time.Duration
 }
 
 // Consumer manages consuming messages of a ledger using a sequence map.
@@ -251,28 +261,25 @@ func (c *Consumer) worker() error {
 	// prepare first flag
 	first := true
 
-	for {
-		// check if closed
-		if !c.tomb.Alive() {
-			// store potentially uncommitted markers if skip is enabled
-			if c.table != nil && len(skipped) > 0 {
-				// compile markers
-				list := CompileSequences(markers)
+	defer func() {
+		// store potentially uncommitted markers if skip is enabled
+		if c.table != nil && len(skipped) > 0 {
+			// compile markers
+			list := CompileSequences(markers)
 
-				// store markers in table
-				err := c.table.Set(c.config.Name, list)
+			// store markers in table
+			err := c.table.Set(c.config.Name, list)
 
-				// call acks with result
-				for _, ack := range skipped {
-					if ack != nil {
-						ack(err)
-					}
+			// call acks with result
+			for _, ack := range skipped {
+				if ack != nil {
+					ack(err)
 				}
 			}
-
-			return tomb.ErrDying
 		}
+	}()
 
+	for {
 		// prepare dynamic pipe
 		var dynPipe <-chan Entry
 
@@ -285,13 +292,21 @@ func (c *Consumer) worker() error {
 		var dynQueue chan<- Entry
 		var dynEntry Entry
 
-		// only queue an entry if one is available
-		if buffer.Length() > 0 {
+		// only queue an entry if one is available and there is space
+		if buffer.Length() > 0 && len(markers) < c.config.Window+1 {
 			dynQueue = c.config.Entries
 			buffer.Scan(func(entry Entry) bool {
 				dynEntry = entry
 				return false
 			})
+		}
+
+		// prepare dynamic timeout
+		var dynTimeout <-chan time.Time
+
+		// set timeout if window is full and enabled
+		if len(markers) >= c.config.Window+1 && c.config.Timeout > 0 {
+			dynTimeout = time.After(c.config.Timeout)
 		}
 
 		// buffer entry, queue entry or handle mark
@@ -401,7 +416,10 @@ func (c *Consumer) worker() error {
 
 			// reset list
 			skipped = nil
+		case <-dynTimeout:
+			return c.die(ErrConsumerTimeout)
 		case <-c.tomb.Dying():
+			return tomb.ErrDying
 		}
 	}
 }
