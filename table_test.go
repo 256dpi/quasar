@@ -20,6 +20,10 @@ func TestTable(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, count)
 
+	all, err := table.All()
+	assert.NoError(t, err)
+	assert.Equal(t, map[string][]uint64{}, all)
+
 	// set
 
 	err = table.Set("foo", []uint64{1})
@@ -32,6 +36,12 @@ func TestTable(t *testing.T) {
 	count, err = table.Count()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
+
+	all, err = table.All()
+	assert.NoError(t, err)
+	assert.Equal(t, map[string][]uint64{
+		"foo": {1},
+	}, all)
 
 	assert.Equal(t, map[string]string{
 		"table!foo": "1",
@@ -50,6 +60,10 @@ func TestTable(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, count)
 
+	all, err = table.All()
+	assert.NoError(t, err)
+	assert.Equal(t, map[string][]uint64{}, all)
+
 	assert.Equal(t, map[string]string{}, dump(db))
 
 	// reset
@@ -61,6 +75,12 @@ func TestTable(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{1}, position)
 
+	all, err = table.All()
+	assert.NoError(t, err)
+	assert.Equal(t, map[string][]uint64{
+		"foo": {1},
+	}, all)
+
 	count, err = table.Count()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
@@ -69,6 +89,10 @@ func TestTable(t *testing.T) {
 
 	err = table.Clear()
 	assert.NoError(t, err)
+
+	all, err = table.All()
+	assert.NoError(t, err)
+	assert.Equal(t, map[string][]uint64{}, all)
 
 	count, err = table.Count()
 	assert.NoError(t, err)

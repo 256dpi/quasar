@@ -83,6 +83,54 @@ func (m *Table) Get(name string) ([]uint64, error) {
 	return positions, nil
 }
 
+// All will return a map with all stored positions.
+func (m *Table) All() (map[string][]uint64, error) {
+	// prepare table
+	table := make(map[string][]uint64)
+
+	// iterate over all keys
+	err := m.db.View(func(txn *badger.Txn) error {
+		// prepare options
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = m.prefix
+
+		// create iterator
+		iter := txn.NewIterator(badger.IteratorOptions{
+			Prefix:         m.prefix,
+			PrefetchValues: true,
+			PrefetchSize:   100,
+		})
+		defer iter.Close()
+
+		// compute start
+		start := m.makeKey("")
+
+		// iterate over all keys
+		for iter.Seek(start); iter.Valid(); iter.Next() {
+			// parse positions
+			var positions []uint64
+			var err error
+			err = iter.Item().Value(func(val []byte) error {
+				positions, err = DecodeSequences(val)
+				return err
+			})
+			if err != nil {
+				return err
+			}
+
+			// set positions
+			table[string(iter.Item().Key()[len(m.prefix):])] = positions
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return table, nil
+}
+
 // Delete will remove the specified position from the table.
 func (m *Table) Delete(name string) error {
 	// delete item
