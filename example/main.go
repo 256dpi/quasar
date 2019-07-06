@@ -67,7 +67,8 @@ func consumer(queue *quasar.Queue) {
 		Batch:    2500,
 		Window:   5000,
 		Skip:     2500,
-		Deadline: time.Second,
+		Timeout:  time.Second,
+		Deadline: 10 * time.Second,
 	})
 
 	// ensure closing

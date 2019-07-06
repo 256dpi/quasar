@@ -622,6 +622,78 @@ func TestConsumerSkipMark(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestConsumerSkipMarkTimeout(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	assert.NoError(t, err)
+
+	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	assert.NoError(t, err)
+
+	for i := 1; i <= 100; i++ {
+		err = ledger.Write(Entry{
+			Sequence: uint64(i),
+			Payload:  []byte("foo"),
+		})
+		assert.NoError(t, err)
+	}
+
+	entries := make(chan Entry, 1)
+
+	consumer := NewConsumer(ledger, table, ConsumerConfig{
+		Name:    "foo",
+		Entries: entries,
+		Errors: func(err error) {
+			panic(err)
+		},
+		Batch:   5,
+		Window:  10,
+		Skip:    5,
+		Timeout: 50 * time.Millisecond,
+	})
+
+	entry := <-entries
+
+	ret1 := make(chan error, 1)
+	ok := consumer.Mark(entry.Sequence, false, func(err error) {
+		ret1 <- err
+	})
+	assert.True(t, ok)
+
+	time.Sleep(10 * time.Millisecond)
+
+	sequences, err := table.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, []uint64{0}, sequences)
+
+	entry = <-entries
+
+	ret2 := make(chan error, 1)
+	ok = consumer.Mark(entry.Sequence, false, func(err error) {
+		ret2 <- err
+	})
+	assert.True(t, ok)
+
+	time.Sleep(10 * time.Millisecond)
+
+	sequences, err = table.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, []uint64{0}, sequences)
+
+	assert.NoError(t, <-ret1)
+	assert.NoError(t, <-ret2)
+
+	sequences, err = table.Get("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, []uint64{2}, sequences)
+
+	consumer.Close()
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func TestConsumerUnblock(t *testing.T) {
 	db := openDB(true)
 

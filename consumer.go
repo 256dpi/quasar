@@ -49,6 +49,9 @@ type ConsumerConfig struct {
 	// The number of acks to skip before sequences are written to the table.
 	Skip int
 
+	// The time after skipped marks are persisted to the table.
+	Timeout time.Duration
+
 	// The time after which the consumer crashes if it cannot make progress.
 	Deadline time.Duration
 }
@@ -232,6 +235,9 @@ func (c *Consumer) worker() error {
 		}
 	}()
 
+	// prepare dynamic timeout
+	var dynTimeout <-chan time.Time
+
 	for {
 		// prepare dynamic pipe
 		var dynPipe <-chan Entry
@@ -328,9 +334,16 @@ func (c *Consumer) worker() error {
 				}
 			}
 
-			// cache ack if skipping is enabled and there is space
+			// check if skipping is enabled and there is space
 			if c.config.Skip > 0 && len(skipped) < c.config.Skip {
+				// cache ack
 				skipped = append(skipped, tuple.ack)
+
+				// ensure timeout if configured
+				if c.config.Timeout > 0 && dynTimeout == nil {
+					dynTimeout = time.After(c.config.Timeout)
+				}
+
 				continue
 			}
 
@@ -367,8 +380,36 @@ func (c *Consumer) worker() error {
 				tuple.ack(nil)
 			}
 
-			// reset list
+			// reset list and timeout
 			skipped = nil
+			dynTimeout = nil
+		case <-dynTimeout:
+			// compile markers
+			list := CompileSequences(markers)
+
+			// store markers in table
+			err := c.table.Set(c.config.Name, list)
+			if err != nil {
+				return c.die(err)
+			}
+
+			// compress markers
+			for seq := range markers {
+				if seq < list[0] {
+					delete(markers, seq)
+				}
+			}
+
+			// call cached acks
+			for _, ack := range skipped {
+				if ack != nil {
+					ack(nil)
+				}
+			}
+
+			// reset list and timeout
+			skipped = nil
+			dynTimeout = nil
 		case <-dynDeadline:
 			return c.die(ErrConsumerDeadlock)
 		case <-c.tomb.Dying():
