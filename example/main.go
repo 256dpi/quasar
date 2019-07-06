@@ -64,10 +64,10 @@ func consumer(queue *quasar.Queue) {
 		Errors: func(err error) {
 			panic(err)
 		},
-		Batch:   2500,
-		Window:  5000,
-		Skip:    2500,
-		Timeout: time.Second,
+		Batch:    2500,
+		Window:   5000,
+		Skip:     2500,
+		Deadline: time.Second,
 	})
 
 	// ensure closing

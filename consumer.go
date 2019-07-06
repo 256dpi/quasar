@@ -15,9 +15,9 @@ var ErrInvalidSequence = errors.New("invalid sequence")
 // ErrConsumerClosed is yielded to callbacks if the consumer has been closed.
 var ErrConsumerClosed = errors.New("consumer closed")
 
-// ErrConsumerTimeout is returned by the consumer if the specified timeout has
+// ErrConsumerDeadlock is returned by the consumer if the specified deadline has
 // been reached.
-var ErrConsumerTimeout = errors.New("consumer timeout")
+var ErrConsumerDeadlock = errors.New("consumer deadlock")
 
 type consumerTuple struct {
 	seq uint64
@@ -49,8 +49,8 @@ type ConsumerConfig struct {
 	// The number of acks to skip before sequences are written to the table.
 	Skip int
 
-	// The timeout after which the consumer crashes if it cannot make progress.
-	Timeout time.Duration
+	// The time after which the consumer crashes if it cannot make progress.
+	Deadline time.Duration
 }
 
 // Consumer manages consuming messages of a ledger.
@@ -254,12 +254,12 @@ func (c *Consumer) worker() error {
 			})
 		}
 
-		// prepare dynamic timeout
-		var dynTimeout <-chan time.Time
+		// prepare dynamic deadline
+		var dynDeadline <-chan time.Time
 
-		// set timeout if window is full and enabled
-		if len(markers) >= c.config.Window+1 && c.config.Timeout > 0 {
-			dynTimeout = time.After(c.config.Timeout)
+		// set deadline if enabled and window is full
+		if c.config.Deadline > 0 && len(markers) >= c.config.Window+1 {
+			dynDeadline = time.After(c.config.Deadline)
 		}
 
 		// buffer entry, queue entry or handle mark
@@ -369,8 +369,8 @@ func (c *Consumer) worker() error {
 
 			// reset list
 			skipped = nil
-		case <-dynTimeout:
-			return c.die(ErrConsumerTimeout)
+		case <-dynDeadline:
+			return c.die(ErrConsumerDeadlock)
 		case <-c.tomb.Dying():
 			return tomb.ErrDying
 		}

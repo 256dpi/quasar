@@ -278,9 +278,9 @@ func TestConsumerMissedMark(t *testing.T) {
 		Errors: func(err error) {
 			errs <- err
 		},
-		Batch:   10,
-		Window:  20,
-		Timeout: 10 * time.Millisecond,
+		Batch:    10,
+		Window:   20,
+		Deadline: 10 * time.Millisecond,
 	})
 
 	for {
@@ -300,7 +300,7 @@ func TestConsumerMissedMark(t *testing.T) {
 	}
 
 	err = <-errs
-	assert.Equal(t, ErrConsumerTimeout, err)
+	assert.Equal(t, ErrConsumerDeadlock, err)
 
 	consumer.Close()
 
