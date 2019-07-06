@@ -338,7 +338,7 @@ func TestConsumerTemporary(t *testing.T) {
 		Batch: 10,
 	})
 
-	var next uint64
+	var last uint64
 
 	for {
 		counter++
@@ -347,7 +347,7 @@ func TestConsumerTemporary(t *testing.T) {
 		assert.Equal(t, uint64(counter), entry.Sequence)
 		assert.Equal(t, []byte("foo"), entry.Payload)
 
-		next = entry.Sequence + 1
+		last = entry.Sequence
 
 		if counter == 50 {
 			break
@@ -359,7 +359,7 @@ func TestConsumerTemporary(t *testing.T) {
 	entries = make(chan Entry, 10)
 
 	consumer = NewConsumer(ledger, nil, ConsumerConfig{
-		Start:   next,
+		Start:   last + 1,
 		Entries: entries,
 		Errors: func(err error) {
 			panic(err)

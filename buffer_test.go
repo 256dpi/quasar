@@ -78,7 +78,7 @@ func BenchmarkBufferAdd(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for i := 1; i <= b.N; i++ {
 		cache.Push(Entry{Sequence: uint64(i), Payload: []byte("foo")})
 	}
 }
@@ -86,7 +86,7 @@ func BenchmarkBufferAdd(b *testing.B) {
 func BenchmarkBufferScan(b *testing.B) {
 	cache := NewBuffer(1000)
 
-	for i := 0; i < 1000; i++ {
+	for i := 1; i <= 1000; i++ {
 		cache.Push(Entry{Sequence: uint64(i), Payload: []byte("foo")})
 	}
 

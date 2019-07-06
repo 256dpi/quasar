@@ -133,6 +133,16 @@ func TestCompileSequences(t *testing.T) {
 			},
 			l: []uint64{1, 3, 5},
 		},
+		// inject start
+		{
+			m: map[uint64]bool{
+				1: false,
+				2: true,
+				3: false,
+				4: true,
+			},
+			l: []uint64{0, 2, 4},
+		},
 	}
 
 	for i, item := range table {

@@ -13,8 +13,8 @@ var seconds int64
 var counter uint32
 var mutex sync.Mutex
 
-// SequenceLength defines the encoded length of a sequence.
-const SequenceLength = 20
+// EncodedSequenceLength defines the expected length of an encoded sequence.
+const EncodedSequenceLength = 20
 
 // GenerateSequence will generate a locally monotonic sequence that consists of
 // the current time and an ordinal number. The returned sequence is the first of
@@ -72,7 +72,7 @@ func DecodeSequence(key []byte) (uint64, error) {
 	return strconv.ParseUint(string(key), 10, 64)
 }
 
-// EncodeSequences will encode a list of sequences.
+// EncodeSequences will encode a list of compacted sequences.
 func EncodeSequences(list []uint64) []byte {
 	// check length
 	if len(list) == 0 {
@@ -80,7 +80,7 @@ func EncodeSequences(list []uint64) []byte {
 	}
 
 	// prepare buffer
-	buf := make([]byte, 0, len(list)*(SequenceLength+1))
+	buf := make([]byte, 0, len(list)*(EncodedSequenceLength+1))
 
 	// add sequences
 	for _, item := range list {
@@ -91,7 +91,7 @@ func EncodeSequences(list []uint64) []byte {
 	return buf[:len(buf)-1]
 }
 
-// DecodeSequences will decode a list of sequences.
+// DecodeSequences will decode a list of compacted sequences.
 func DecodeSequences(value []byte) ([]uint64, error) {
 	// prepare list
 	list := make([]uint64, 0, bytes.Count(value, []byte(",")))

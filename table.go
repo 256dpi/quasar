@@ -17,7 +17,7 @@ type Table struct {
 	prefix []byte
 }
 
-// CreateTable will create a table that stores positions in the provided db.
+// CreateTable will create a table that stores position markers.
 func CreateTable(db *DB, config TableConfig) (*Table, error) {
 	// check prefix
 	if config.Prefix == "" {
@@ -34,13 +34,13 @@ func CreateTable(db *DB, config TableConfig) (*Table, error) {
 	return t, nil
 }
 
-// Set will write the specified sequences to the table.
-func (m *Table) Set(name string, sequences []uint64) error {
+// Set will write the specified positions to the table.
+func (m *Table) Set(name string, positions []uint64) error {
 	// set entry
 	err := retryUpdate(m.db, func(txn *badger.Txn) error {
 		return txn.SetEntry(&badger.Entry{
 			Key:   m.makeKey(name),
-			Value: EncodeSequences(sequences),
+			Value: EncodeSequences(positions),
 		})
 	})
 	if err != nil {
@@ -50,10 +50,10 @@ func (m *Table) Set(name string, sequences []uint64) error {
 	return nil
 }
 
-// Get will read the specified sequences from the table.
+// Get will read the specified positions from the table.
 func (m *Table) Get(name string) ([]uint64, error) {
-	// prepare sequences
-	var sequences []uint64
+	// prepare positions
+	var positions []uint64
 
 	// read entries
 	err := m.db.View(func(txn *badger.Txn) error {
@@ -67,7 +67,7 @@ func (m *Table) Get(name string) ([]uint64, error) {
 
 		// parse key
 		err = item.Value(func(val []byte) error {
-			sequences, err = DecodeSequences(val)
+			positions, err = DecodeSequences(val)
 			return err
 		})
 		if err != nil {
@@ -80,10 +80,10 @@ func (m *Table) Get(name string) ([]uint64, error) {
 		return nil, err
 	}
 
-	return sequences, nil
+	return positions, nil
 }
 
-// Delete will remove the specified sequences from the table.
+// Delete will remove the specified position from the table.
 func (m *Table) Delete(name string) error {
 	// delete item
 	err := retryUpdate(m.db, func(txn *badger.Txn) error {
@@ -96,7 +96,7 @@ func (m *Table) Delete(name string) error {
 	return nil
 }
 
-// Count will return the number of stored sequences.
+// Count will return the number of stored positions.
 func (m *Table) Count() (int, error) {
 	// prepare counter
 	var counter int
@@ -154,11 +154,11 @@ func (m *Table) Range() (uint64, uint64, bool, error) {
 
 		// iterate over all keys
 		for iter.Seek(start); iter.Valid(); iter.Next() {
-			// parse key
-			var sequences []uint64
+			// parse positions
+			var positions []uint64
 			var err error
 			err = iter.Item().Value(func(val []byte) error {
-				sequences, err = DecodeSequences(val)
+				positions, err = DecodeSequences(val)
 				return err
 			})
 			if err != nil {
@@ -166,18 +166,18 @@ func (m *Table) Range() (uint64, uint64, bool, error) {
 			}
 
 			// continue if empty
-			if len(sequences) == 0 {
+			if len(positions) == 0 {
 				continue
 			}
 
 			// set min
-			if min == 0 || sequences[0] < min {
-				min = sequences[0]
+			if min == 0 || positions[0] < min {
+				min = positions[0]
 			}
 
 			// set max
-			if max == 0 || sequences[len(sequences)-1] > max {
-				max = sequences[len(sequences)-1]
+			if max == 0 || positions[len(positions)-1] > max {
+				max = positions[len(positions)-1]
 			}
 
 			// set flag
@@ -193,7 +193,7 @@ func (m *Table) Range() (uint64, uint64, bool, error) {
 	return min, max, found, nil
 }
 
-// Clear will drop all table entries. Clear will temporarily block concurrent
+// Clear will drop all stored positions. Clear will temporarily block concurrent
 // writes and deletes and lock the underlying database. Other users uf the same
 // database may receive errors due to the locked database.
 func (m *Table) Clear() error {

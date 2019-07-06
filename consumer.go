@@ -162,53 +162,6 @@ func (c *Consumer) Close() {
 	_ = c.tomb.Wait()
 }
 
-func (c *Consumer) reader() error {
-	// subscribe to notifications
-	notifications := make(chan uint64, 1)
-	c.ledger.Subscribe(notifications)
-	defer c.ledger.Unsubscribe(notifications)
-
-	// get initial position
-	position := c.start
-
-	for {
-		// check if closed
-		if !c.tomb.Alive() {
-			return tomb.ErrDying
-		}
-
-		// get current head
-		head := c.ledger.Head()
-
-		// wait for notification if no new data in ledger
-		if head < position || (head == 0 && position == 0) {
-			select {
-			case <-notifications:
-			case <-c.tomb.Dying():
-				return tomb.ErrDying
-			}
-
-			continue
-		}
-
-		// read entries
-		entries, err := c.ledger.Read(position, c.config.Batch)
-		if err != nil {
-			return c.die(err)
-		}
-
-		// put entries on pipe
-		for _, entry := range entries {
-			select {
-			case c.pipe <- entry:
-				position = entry.Sequence + 1
-			case <-c.tomb.Dying():
-				return tomb.ErrDying
-			}
-		}
-	}
-}
-
 func (c *Consumer) worker() error {
 	// cancel queued marks on exit
 	defer func() {
@@ -219,31 +172,31 @@ func (c *Consumer) worker() error {
 		}
 	}()
 
-	// prepare stored markers
-	var storedMarkers []uint64
+	// prepare stored positions
+	var storedPositions []uint64
 
 	// check if persistent
 	if c.table != nil {
-		// fetch stored markers
-		markers, err := c.table.Get(c.config.Name)
+		// fetch stored positions
+		positions, err := c.table.Get(c.config.Name)
 		if err != nil {
 			return c.die(err)
 		}
 
-		// check if markers haven been recovered
-		if len(markers) > 0 {
-			// set start to first sequence
-			c.start = markers[0] + 1
+		// check if positions haven been recovered
+		if len(positions) > 0 {
+			// set start to first position
+			c.start = positions[0]
 		} else {
-			// store provided initial start sequence in table
+			// store provided initial start position in table
 			err := c.table.Set(c.config.Name, []uint64{c.start})
 			if err != nil {
 				return c.die(err)
 			}
 		}
 
-		// set stored markers
-		storedMarkers = markers
+		// set stored positions
+		storedPositions = positions
 	}
 
 	// run reader
@@ -312,11 +265,11 @@ func (c *Consumer) worker() error {
 		// buffer entry, queue entry or handle mark
 		select {
 		case entry := <-dynPipe:
-			// restore stored markers that are newer or equal to first entry
+			// restore stored positions that are newer or equal to first entry
 			if first {
-				for _, seq := range storedMarkers {
-					if seq >= entry.Sequence {
-						markers[seq] = true
+				for _, position := range storedPositions {
+					if position >= entry.Sequence {
+						markers[position] = true
 					}
 				}
 
@@ -420,6 +373,53 @@ func (c *Consumer) worker() error {
 			return c.die(ErrConsumerTimeout)
 		case <-c.tomb.Dying():
 			return tomb.ErrDying
+		}
+	}
+}
+
+func (c *Consumer) reader() error {
+	// subscribe to notifications
+	notifications := make(chan uint64, 1)
+	c.ledger.Subscribe(notifications)
+	defer c.ledger.Unsubscribe(notifications)
+
+	// get initial position
+	position := c.start
+
+	for {
+		// check if closed
+		if !c.tomb.Alive() {
+			return tomb.ErrDying
+		}
+
+		// get current head
+		head := c.ledger.Head()
+
+		// wait for notification if no new data in ledger
+		if head < position || (head == 0 && position == 0) {
+			select {
+			case <-notifications:
+			case <-c.tomb.Dying():
+				return tomb.ErrDying
+			}
+
+			continue
+		}
+
+		// read entries
+		entries, err := c.ledger.Read(position, c.config.Batch)
+		if err != nil {
+			return c.die(err)
+		}
+
+		// put entries on pipe
+		for _, entry := range entries {
+			select {
+			case c.pipe <- entry:
+				position = entry.Sequence + 1
+			case <-c.tomb.Dying():
+				return tomb.ErrDying
+			}
 		}
 	}
 }

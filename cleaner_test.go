@@ -94,7 +94,7 @@ func TestCleanerMaxRetention(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestCleanerTablePosition(t *testing.T) {
+func TestCleanerTablePositions(t *testing.T) {
 	db := openDB(true)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})

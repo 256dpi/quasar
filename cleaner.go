@@ -111,15 +111,15 @@ func (c *Cleaner) clean() error {
 
 	// honor lowest table sequence
 	for _, table := range c.config.Tables {
-		// get lowest sequence in table
-		tablePosition, _, ok, err := table.Range()
+		// get lowest position in table
+		lowestPosition, _, ok, err := table.Range()
 		if err != nil {
 			return err
 		}
 
 		// set to lowest position if valid
-		if ok && tablePosition < position {
-			position = tablePosition
+		if ok && lowestPosition < position {
+			position = lowestPosition
 		}
 	}
 
@@ -130,7 +130,7 @@ func (c *Cleaner) clean() error {
 		}
 	}
 
-	// delete entries up to the calculated position
+	// delete entries up to and including the calculated position
 	_, err = c.ledger.Delete(position)
 	if err != nil {
 		return err

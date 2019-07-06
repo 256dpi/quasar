@@ -636,7 +636,7 @@ func (l *Ledger) Unsubscribe(receiver chan<- uint64) {
 }
 
 func (l *Ledger) makeEntryKey(seq uint64) []byte {
-	b := make([]byte, 0, len(l.entryPrefix)+SequenceLength)
+	b := make([]byte, 0, len(l.entryPrefix)+EncodedSequenceLength)
 	return append(append(b, l.entryPrefix...), EncodeSequence(seq, false)...)
 }
 
