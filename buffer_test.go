@@ -11,6 +11,8 @@ func TestBuffer(t *testing.T) {
 	entry2 := Entry{Sequence: 2, Payload: []byte("bar")}
 	entry3 := Entry{Sequence: 3, Payload: []byte("baz")}
 
+	// empty
+
 	cache := NewBuffer(2)
 	assert.Equal(t, 0, cache.Length())
 
@@ -20,6 +22,8 @@ func TestBuffer(t *testing.T) {
 		return true
 	})
 	assert.Equal(t, []Entry(nil), list)
+
+	// one entry
 
 	cache.Push(entry1)
 	assert.Equal(t, 1, cache.Length())
@@ -31,6 +35,8 @@ func TestBuffer(t *testing.T) {
 	})
 	assert.Equal(t, []Entry{entry1}, list)
 
+	// two entries
+
 	cache.Push(entry2)
 	assert.Equal(t, 2, cache.Length())
 
@@ -40,6 +46,8 @@ func TestBuffer(t *testing.T) {
 		return true
 	})
 	assert.Equal(t, []Entry{entry1, entry2}, list)
+
+	// three entries
 
 	cache.Push(entry3)
 	assert.Equal(t, 2, cache.Length())
@@ -51,6 +59,8 @@ func TestBuffer(t *testing.T) {
 	})
 	assert.Equal(t, []Entry{entry2, entry3}, list)
 
+	// remove first two
+
 	cache.Trim(func(e Entry) bool {
 		return e.Sequence <= 2
 	})
@@ -61,6 +71,8 @@ func TestBuffer(t *testing.T) {
 		return true
 	})
 	assert.Equal(t, []Entry{entry3}, list)
+
+	// reset
 
 	cache.Reset()
 
