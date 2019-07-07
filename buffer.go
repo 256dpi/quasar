@@ -92,10 +92,10 @@ func (b *Buffer) Trim(fn func(Entry) bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	// iterate through from tail to head
-	for i := 0; i < b.length; i++ {
-		// return if false is returned
-		if !fn(b.nodes[b.wrap(b.tail+i)]) {
+	// loop as long as there are entries
+	for b.length > 0 {
+		// stop if false is returned
+		if !fn(b.nodes[b.wrap(b.tail)]) {
 			return
 		}
 
