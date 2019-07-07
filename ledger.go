@@ -427,7 +427,7 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 	// delete in multiple attempts to honor max batch count
 	for {
 		// perform partial delete
-		tail, n, done, err := l.partialDelete(sequence)
+		last, n, done, err := l.partialDelete(sequence)
 		if err != nil {
 			return counter, err
 		}
@@ -438,9 +438,9 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 		l.mutex.Unlock()
 
 		// remove deleted entries from cache
-		if l.cache != nil && tail > 0 {
+		if l.cache != nil && last > 0 {
 			l.cache.Trim(func(entry Entry) bool {
-				return entry.Sequence <= tail
+				return entry.Sequence <= last
 			})
 		}
 
@@ -460,16 +460,16 @@ func (l *Ledger) partialDelete(sequence uint64) (uint64, int, bool, error) {
 	// compute needle
 	needle := l.makeEntryKey(sequence)
 
-	// prepare counter, tail and done
+	// prepare counter, last and done
 	var counter int
-	var tail uint64
+	var last uint64
 	var done bool
 
 	// begin database update
 	err := retryUpdate(l.db, func(txn *badger.Txn) error {
 		// reset effects
 		counter = 0
-		tail = 0
+		last = 0
 		done = true
 
 		// create iterator
@@ -479,7 +479,7 @@ func (l *Ledger) partialDelete(sequence uint64) (uint64, int, bool, error) {
 		defer iter.Close()
 
 		// cache last processed key
-		var last []byte
+		var lastKey []byte
 
 		// delete all entries
 		for iter.Seek(l.makeEntryKey(0)); iter.Valid(); iter.Next() {
@@ -492,7 +492,7 @@ func (l *Ledger) partialDelete(sequence uint64) (uint64, int, bool, error) {
 			key := iter.Item().KeyCopy(nil)
 
 			// set last
-			last = key
+			lastKey = key
 
 			// delete entry
 			err := txn.Delete(key)
@@ -510,16 +510,16 @@ func (l *Ledger) partialDelete(sequence uint64) (uint64, int, bool, error) {
 			}
 		}
 
-		// get tail from last key if available
-		if last != nil {
+		// get last from last key if available
+		if lastKey != nil {
 			// parse key
-			seq, err := DecodeSequence(last[len(l.entryPrefix):])
+			seq, err := DecodeSequence(lastKey[len(l.entryPrefix):])
 			if err != nil {
 				return err
 			}
 
-			// set tail
-			tail = seq
+			// set last
+			last = seq
 		}
 
 		return nil
@@ -528,7 +528,7 @@ func (l *Ledger) partialDelete(sequence uint64) (uint64, int, bool, error) {
 		return 0, 0, false, err
 	}
 
-	return tail, counter, done, nil
+	return last, counter, done, nil
 }
 
 // Length will return the number of stored entries.
