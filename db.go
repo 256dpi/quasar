@@ -24,6 +24,13 @@ type DB = badger.DB
 
 // DBConfig is used to configure a DB.
 type DBConfig struct {
+	// The interval at which the database is synced to disk. If absent, the
+	// database will sync after every operation.
+	SyncInterval time.Duration
+
+	// The callback that receives sync errors.
+	SyncErrors func(error)
+
 	// The interval of the garbage collector.
 	GCInterval time.Duration
 
@@ -49,8 +56,13 @@ func OpenDB(directory string, config DBConfig) (*DB, func(), error) {
 	}
 
 	// prepare options
-	bo := badger.DefaultOptions(directory).
-		WithLogger(nil)
+	bo := badger.DefaultOptions(directory)
+	bo.Logger = nil
+
+	// disable sync if sync interval is given
+	if config.SyncInterval > 0 {
+		bo.SyncWrites = false
+	}
 
 	// set logger if available
 	if config.Logger != nil {
@@ -65,6 +77,26 @@ func OpenDB(directory string, config DBConfig) (*DB, func(), error) {
 
 	// prepare tomb
 	var tmb tomb.Tomb
+
+	// run sync routine if requested
+	if config.SyncInterval > 0 {
+		tmb.Go(func() error {
+			for {
+				// sleep some time
+				select {
+				case <-time.After(config.SyncInterval):
+				case <-tmb.Dying():
+					return tomb.ErrDying
+				}
+
+				// sync database
+				err = db.Sync()
+				if err != nil && config.SyncErrors != nil {
+					config.SyncErrors(err)
+				}
+			}
+		})
+	}
 
 	// run gc routine if requested
 	if config.GCInterval > 0 {
