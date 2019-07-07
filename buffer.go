@@ -57,6 +57,35 @@ func (b *Buffer) Scan(fn func(Entry) bool) {
 	}
 }
 
+// Index will return the entry on the specified position in the buffer. Negative
+// indexes are counted backwards.
+func (b *Buffer) Index(index int) (Entry, bool) {
+	// compute direction
+	backward := index < 0
+
+	// make absolute if backward
+	if backward {
+		index *= -1
+		index--
+	}
+
+	// acquire mutex
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	// check if in range
+	if index >= b.length {
+		return Entry{}, false
+	}
+
+	// handle backward index
+	if backward {
+		return b.nodes[b.wrap(b.head-(index+1))], true
+	}
+
+	return b.nodes[b.wrap(b.tail+index)], true
+}
+
 // Trim will remove entries from the buffer until false is returned.
 func (b *Buffer) Trim(fn func(Entry) bool) {
 	// acquire mutex
@@ -107,6 +136,11 @@ func (b *Buffer) wrap(i int) int {
 	// subtract size if is greater than size
 	if i >= b.size {
 		return i - b.size
+	}
+
+	// add size if less than zero
+	if i < 0 {
+		return i + b.size
 	}
 
 	return i
