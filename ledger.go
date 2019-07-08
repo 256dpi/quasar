@@ -99,7 +99,7 @@ func (l *Ledger) init() error {
 	var length int
 	var head uint64
 
-	// read length and head from entries and fields
+	// read length, head and preload cache if available
 	err := l.db.View(func(txn *badger.Txn) error {
 		// create iterator
 		iter := txn.NewIterator(badger.IteratorOptions{
@@ -272,14 +272,12 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 				return false
 			}
 
-			// otherwise add item if in range
+			// otherwise add item if in range and stop if list is full
 			if entry.Sequence >= sequence {
 				list = append(list, entry)
-			}
-
-			// stop if list is full
-			if len(list) >= amount {
-				return false
+				if len(list) >= amount {
+					return false
+				}
 			}
 
 			// increment counter
@@ -289,7 +287,7 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 		})
 	}
 
-	// return cache list immediately
+	// return cached entries immediately
 	if len(list) > 0 {
 		return list, nil
 	}
@@ -351,8 +349,8 @@ func (l *Ledger) Index(index int) (uint64, bool, error) {
 		index--
 	}
 
-	// lookup index in cache if backwards
-	if l.cache != nil && backward {
+	// lookup backward index in cache if available
+	if backward && l.cache != nil {
 		entry, ok := l.cache.Index((index + 1) * -1)
 		if ok {
 			return entry.Sequence, true, nil
