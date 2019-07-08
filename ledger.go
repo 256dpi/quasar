@@ -101,9 +101,11 @@ func (l *Ledger) init() error {
 
 	// read length and head from entries and fields
 	err := l.db.View(func(txn *badger.Txn) error {
-		// create iterator (key only)
+		// create iterator
 		iter := txn.NewIterator(badger.IteratorOptions{
-			Prefix: l.entryPrefix,
+			Prefix:         l.entryPrefix,
+			PrefetchValues: l.cache != nil,
+			PrefetchSize:   100,
 		})
 		defer iter.Close()
 
@@ -119,6 +121,21 @@ func (l *Ledger) init() error {
 			seq, err := DecodeSequence(iter.Item().Key()[len(l.entryPrefix):])
 			if err != nil {
 				return err
+			}
+
+			// cache entry
+			if l.cache != nil {
+				// copy value
+				value, err := iter.Item().ValueCopy(nil)
+				if err != nil {
+					return err
+				}
+
+				// store entry
+				l.cache.Push(Entry{
+					Sequence: seq,
+					Payload:  value,
+				})
 			}
 
 			// set head
