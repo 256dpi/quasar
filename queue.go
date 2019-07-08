@@ -10,23 +10,26 @@ type QueueConfig struct {
 	// The prefix for all keys.
 	Prefix string
 
-	// The amount of entries to cache in memory.
-	Cache int
-
-	// The amount of entries to keep around.
-	Retention int
+	// The amount of ledger entries to cache in memory.
+	LedgerCache int
 
 	// The maximum length of the ledger.
-	Limit int
+	LedgerLimit int
+
+	// Whether the table should be fully cached in memory.
+	TableCache bool
+
+	// The amount of entries to keep around.
+	CleanRetention int
 
 	// The point after which entries are dropped no matter what.
-	Threshold int
+	CleanThreshold int
 
 	// The interval of periodic cleanings.
-	Interval time.Duration
+	CleanInterval time.Duration
 
 	// The callback used to yield cleaner errors.
-	Errors func(error)
+	CleanErrors func(error)
 }
 
 // Queue is a managed ledger and table with a cleaner.
@@ -42,8 +45,8 @@ func CreateQueue(db *DB, config QueueConfig) (*Queue, error) {
 	// create ledger
 	ledger, err := CreateLedger(db, LedgerConfig{
 		Prefix: fmt.Sprintf("%s:l", config.Prefix),
-		Cache:  config.Cache,
-		Limit:  config.Limit,
+		Cache:  config.LedgerCache,
+		Limit:  config.LedgerLimit,
 	})
 	if err != nil {
 		return nil, err
@@ -52,6 +55,7 @@ func CreateQueue(db *DB, config QueueConfig) (*Queue, error) {
 	// create table
 	table, err := CreateTable(db, TableConfig{
 		Prefix: fmt.Sprintf("%s:t", config.Prefix),
+		Cache:  config.TableCache,
 	})
 	if err != nil {
 		return nil, err
@@ -61,13 +65,13 @@ func CreateQueue(db *DB, config QueueConfig) (*Queue, error) {
 	var cleaner *Cleaner
 
 	// create cleaner if interval is set
-	if config.Interval > 0 {
+	if config.CleanInterval > 0 {
 		cleaner = NewCleaner(ledger, CleanerConfig{
-			Retention: config.Retention,
-			Threshold: config.Threshold,
-			Interval:  config.Interval,
+			Retention: config.CleanRetention,
+			Threshold: config.CleanThreshold,
+			Interval:  config.CleanInterval,
 			Tables:    []*Table{table},
-			Errors:    config.Errors,
+			Errors:    config.CleanErrors,
 		})
 	}
 

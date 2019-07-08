@@ -11,12 +11,12 @@ func TestQueue(t *testing.T) {
 	db := openDB(true)
 
 	queue, err := CreateQueue(db, QueueConfig{
-		Prefix:    "queue",
-		Cache:     10,
-		Retention: 20,
-		Limit:     30,
-		Interval:  5 * time.Millisecond,
-		Errors: func(err error) {
+		Prefix:         "queue",
+		LedgerCache:    10,
+		CleanRetention: 20,
+		LedgerLimit:    30,
+		CleanInterval:  5 * time.Millisecond,
+		CleanErrors: func(err error) {
 			panic(err)
 		},
 	})
