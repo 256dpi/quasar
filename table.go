@@ -21,6 +21,7 @@ type Table struct {
 	config TableConfig
 	prefix []byte
 	cache  *sync.Map
+	mutex  sync.RWMutex
 }
 
 // CreateTable will create a table that stores position markers.
@@ -104,6 +105,10 @@ func (t *Table) init() error {
 
 // Set will write the specified positions to the table.
 func (t *Table) Set(name string, positions []uint64) error {
+	// acquire mutex
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
 	// ignore empty positions
 	if len(positions) == 0 {
 		return nil
@@ -130,6 +135,10 @@ func (t *Table) Set(name string, positions []uint64) error {
 
 // Get will read the specified positions from the table.
 func (t *Table) Get(name string) ([]uint64, error) {
+	// acquire mutex
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
 	// get positions from cache if available
 	if t.cache != nil {
 		value, ok := t.cache.Load(name)
@@ -174,6 +183,10 @@ func (t *Table) Get(name string) ([]uint64, error) {
 
 // All will return a map with all stored positions.
 func (t *Table) All() (map[string][]uint64, error) {
+	// acquire mutex
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
 	// prepare table
 	table := make(map[string][]uint64)
 
@@ -232,6 +245,10 @@ func (t *Table) All() (map[string][]uint64, error) {
 
 // Delete will remove the specified positions from the table.
 func (t *Table) Delete(name string) error {
+	// acquire mutex
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
 	// delete item
 	err := retryUpdate(t.db, func(txn *badger.Txn) error {
 		return txn.Delete(t.makeKey(name))
@@ -251,6 +268,10 @@ func (t *Table) Delete(name string) error {
 // Range will return the range of stored positions and whether there are any
 // stored positions at all.
 func (t *Table) Range() (uint64, uint64, bool, error) {
+	// acquire mutex
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
 	// prepare counter
 	var min, max uint64
 
@@ -347,6 +368,10 @@ func (t *Table) Range() (uint64, uint64, bool, error) {
 // writes and deletes and lock the underlying database. Other users uf the same
 // database may receive errors due to the locked database.
 func (t *Table) Clear() error {
+	// acquire mutex
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
 	// drop all entries
 	err := t.db.DropPrefix(t.prefix)
 	if err != nil {
