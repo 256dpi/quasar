@@ -174,9 +174,8 @@ func main() {
 	// create queue
 	queue, err := quasar.CreateQueue(db, quasar.QueueConfig{
 		Prefix:    "queue",
-		Cache:     100000,
-		Retention: 100000,
-		Limit:     1000000,
+		Cache:     200000,
+		Limit:     200000,
 		Interval:  500 * time.Millisecond,
 		Errors: func(err error) {
 			panic(err)
