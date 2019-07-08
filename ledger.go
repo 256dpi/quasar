@@ -444,13 +444,28 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 		sequence = head
 	}
 
+	// we can do a fast delete if the ledger is fully cached
+	fast := l.config.Cache > 0 && l.config.Limit > 0 && l.config.Cache >= l.config.Limit
+
 	// prepare counter
 	var counter int
 
 	// delete in multiple attempts to honor max batch count
 	for {
-		// perform partial delete
-		last, n, done, err := l.partialDelete(sequence)
+		// prepare values
+		var last uint64
+		var n int
+		var done bool
+		var err error
+
+		// perform delete
+		if fast {
+			last, n, done, err = l.fastDelete(sequence)
+		} else {
+			last, n, done, err = l.partialDelete(sequence)
+		}
+
+		// check error
 		if err != nil {
 			return counter, err
 		}
@@ -514,14 +529,14 @@ func (l *Ledger) partialDelete(sequence uint64) (uint64, int, bool, error) {
 			// copy key
 			key := iter.Item().KeyCopy(nil)
 
-			// set last
-			lastKey = key
-
 			// delete entry
 			err := txn.Delete(key)
 			if err != nil {
 				return err
 			}
+
+			// set last
+			lastKey = key
 
 			// increment counter
 			counter++
@@ -543,6 +558,73 @@ func (l *Ledger) partialDelete(sequence uint64) (uint64, int, bool, error) {
 
 			// set last
 			last = seq
+		}
+
+		return nil
+	})
+	if err != nil {
+		return 0, 0, false, err
+	}
+
+	return last, counter, done, nil
+}
+
+func (l *Ledger) fastDelete(sequence uint64) (uint64, int, bool, error) {
+	// prepare list
+	var list []uint64
+
+	// prepare counter, last and done
+	var counter int
+	var last uint64
+	var done = true
+
+	// collect sequences from cache
+	l.cache.Scan(func(entry Entry) bool {
+		// check if done
+		if entry.Sequence > sequence {
+			return false
+		}
+
+		// add to list
+		list = append(list, entry.Sequence)
+
+		// set last
+		last = entry.Sequence
+
+		// increment counter
+		counter++
+
+		// stop if transaction is exhausted
+		if counter >= int(l.db.MaxBatchCount()-10) {
+			done = false
+			return false
+		}
+
+		return true
+	})
+
+	// allocate key arena
+	keyLen := len(l.entryPrefix) + EncodedSequenceLength
+	keyBuf := bytes.NewBuffer(make([]byte, 0, len(list)*keyLen))
+
+	// encode sequences
+	for _, seq := range list {
+		_, _ = keyBuf.Write(l.entryPrefix)
+		_ = EncodeSequenceTo(keyBuf, seq, false)
+	}
+
+	// get buffer
+	buf := keyBuf.Bytes()
+
+	// begin database update
+	err := retryUpdate(l.db, func(txn *badger.Txn) error {
+		// delete all sequences
+		for i := range list {
+			pos := i * keyLen
+			err := txn.Delete(buf[pos : pos+keyLen])
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil

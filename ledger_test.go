@@ -443,8 +443,12 @@ func TestLedgerHugeDelete(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int(db.MaxBatchCount()+10), n)
 
-	length := ledger.length
+	length := ledger.Length()
 	assert.Equal(t, 0, length)
+
+	assert.Equal(t, map[string]string{
+		"ledger!head": "104867",
+	}, dump(db))
 
 	err = db.Close()
 	assert.NoError(t, err)
@@ -623,6 +627,46 @@ func TestLedgerLimit(t *testing.T) {
 		Entry{Sequence: 4, Payload: []byte("qux")},
 	)
 	assert.Equal(t, ErrLimitReached, err)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
+func TestLedgerFastDelete(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerConfig{
+		Prefix: "ledger",
+		Cache:  int(db.MaxBatchCount() + 10),
+		Limit:  int(db.MaxBatchCount() + 10),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, ledger)
+
+	batch := make([]Entry, 0, db.MaxBatchCount()+10)
+	for i := int64(1); i <= db.MaxBatchCount()+10; i++ {
+		batch = append(batch, Entry{
+			Sequence: uint64(i),
+			Payload:  []byte("foo"),
+		})
+	}
+
+	err = ledger.Write(batch[0 : db.MaxBatchCount()-10]...)
+	assert.NoError(t, err)
+
+	err = ledger.Write(batch[db.MaxBatchCount()-10 : db.MaxBatchCount()+10]...)
+	assert.NoError(t, err)
+
+	n, err := ledger.Delete(uint64(db.MaxBatchCount() + 10))
+	assert.NoError(t, err)
+	assert.Equal(t, int(db.MaxBatchCount()+10), n)
+
+	length := ledger.Length()
+	assert.Equal(t, 0, length)
+
+	assert.Equal(t, map[string]string{
+		"ledger!head": "104867",
+	}, dump(db))
 
 	err = db.Close()
 	assert.NoError(t, err)
