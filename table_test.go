@@ -163,6 +163,12 @@ func TestTableIsolation(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 
+	all, err := table.All()
+	assert.NoError(t, err)
+	assert.Equal(t, map[string][]uint64{
+		"foo": {2},
+	}, all)
+
 	position, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{2}, position)
