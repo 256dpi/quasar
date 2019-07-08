@@ -3,6 +3,7 @@ package quasar
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"sort"
 	"strconv"
 	"sync"
@@ -65,6 +66,18 @@ func EncodeSequence(s uint64, compact bool) []byte {
 	}
 
 	return []byte(fmt.Sprintf("%020d", s))
+}
+
+// EncodeSequence will encode a sequence to the specified writer.
+func EncodeSequenceTo(w io.Writer, s uint64, compact bool) error {
+	// check compact
+	if compact {
+		_, err := fmt.Fprintf(w, "%d", s)
+		return err
+	}
+
+	_, err := fmt.Fprintf(w, "%020d", s)
+	return err
 }
 
 // DecodeSequence will decode a sequence.
