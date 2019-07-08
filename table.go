@@ -280,6 +280,7 @@ func (t *Table) Range() (uint64, uint64, bool, error) {
 
 	// get position range from cache if available
 	if t.cache != nil {
+		// iterate through all entries
 		t.cache.Range(func(key, value interface{}) bool {
 			// coerce positions
 			positions := value.([]uint64)
@@ -304,6 +305,8 @@ func (t *Table) Range() (uint64, uint64, bool, error) {
 
 			return true
 		})
+
+		return min, max, found, nil
 	}
 
 	// read positions range from database
