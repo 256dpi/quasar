@@ -334,6 +334,14 @@ func (l *Ledger) Index(index int) (uint64, bool, error) {
 		index--
 	}
 
+	// lookup index in cache if backwards
+	if l.cache != nil && backward {
+		entry, ok := l.cache.Index((index + 1) * -1)
+		if ok {
+			return entry.Sequence, true, nil
+		}
+	}
+
 	// prepare sequence and existing
 	var sequence uint64
 	var existing bool

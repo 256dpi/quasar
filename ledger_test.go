@@ -221,6 +221,74 @@ func TestLedgerIndex(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestLedgerIndexCache(t *testing.T) {
+	db := openDB(true)
+
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Cache: 100})
+	assert.NoError(t, err)
+	assert.NotNil(t, ledger)
+
+	index, found, err := ledger.Index(0)
+	assert.NoError(t, err)
+	assert.False(t, found)
+	assert.Equal(t, uint64(0), index)
+
+	index, found, err = ledger.Index(2)
+	assert.NoError(t, err)
+	assert.False(t, found)
+	assert.Equal(t, uint64(0), index)
+
+	index, found, err = ledger.Index(-2)
+	assert.NoError(t, err)
+	assert.False(t, found)
+	assert.Equal(t, uint64(0), index)
+
+	err = ledger.Write(
+		Entry{Sequence: 1, Payload: []byte("foo")},
+		Entry{Sequence: 2, Payload: []byte("bar")},
+		Entry{Sequence: 3, Payload: []byte("baz")},
+		Entry{Sequence: 4, Payload: []byte("qux")},
+	)
+	assert.NoError(t, err)
+
+	index, found, err = ledger.Index(0)
+	assert.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, uint64(1), index)
+
+	index, found, err = ledger.Index(2)
+	assert.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, uint64(3), index)
+
+	index, found, err = ledger.Index(-2)
+	assert.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, uint64(3), index)
+
+	index, found, err = ledger.Index(4)
+	assert.NoError(t, err)
+	assert.False(t, found)
+	assert.Equal(t, uint64(4), index)
+
+	index, found, err = ledger.Index(-5)
+	assert.NoError(t, err)
+	assert.False(t, found)
+	assert.Equal(t, uint64(1), index)
+
+	n, err := ledger.Delete(4)
+	assert.NoError(t, err)
+	assert.Equal(t, 4, n)
+
+	index, found, err = ledger.Index(1)
+	assert.NoError(t, err)
+	assert.False(t, found)
+	assert.Equal(t, uint64(4), index)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func TestLedgerClear(t *testing.T) {
 	db := openDB(true)
 
