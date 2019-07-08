@@ -188,8 +188,8 @@ func (c *Consumer) worker() error {
 
 		// check if positions haven been recovered
 		if len(positions) > 0 {
-			// set start to first position
-			c.start = positions[0]
+			// set start to first position after last marked positions
+			c.start = positions[0] + 1
 		} else {
 			// store provided initial start position in table
 			err := c.table.Set(c.config.Name, []uint64{c.start})
@@ -437,7 +437,7 @@ func (c *Consumer) reader() error {
 		head := c.ledger.Head()
 
 		// wait for notification if no new data in ledger
-		if head < position || (head == 0 && position == 0) {
+		if position > head || (head == 0 && position == 0) {
 			select {
 			case <-notifications:
 			case <-c.tomb.Dying():
