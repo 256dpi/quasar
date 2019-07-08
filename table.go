@@ -1,6 +1,8 @@
 package quasar
 
 import (
+	"sync"
+
 	"github.com/dgraph-io/badger"
 )
 
@@ -8,6 +10,9 @@ import (
 type TableConfig struct {
 	// The prefix for all table keys.
 	Prefix string
+
+	// Enable to keep all positions in memory.
+	Cache bool
 }
 
 // Table manages the storage of positions markers.
@@ -15,6 +20,7 @@ type Table struct {
 	db     *DB
 	config TableConfig
 	prefix []byte
+	cache  *sync.Map
 }
 
 // CreateTable will create a table that stores position markers.
@@ -31,15 +37,82 @@ func CreateTable(db *DB, config TableConfig) (*Table, error) {
 		prefix: append([]byte(config.Prefix), '!'),
 	}
 
+	// set cache
+	if config.Cache {
+		t.cache = new(sync.Map)
+	}
+
+	// init table
+	err := t.init()
+	if err != nil {
+		return nil, err
+	}
+
 	return t, nil
 }
 
+func (t *Table) init() error {
+	// load existing positions if cache is available
+	if t.cache != nil {
+		err := t.db.View(func(txn *badger.Txn) error {
+			// prepare options
+			opts := badger.DefaultIteratorOptions
+			opts.Prefix = t.prefix
+
+			// create iterator
+			iter := txn.NewIterator(badger.IteratorOptions{
+				Prefix:         t.prefix,
+				PrefetchValues: true,
+				PrefetchSize:   100,
+			})
+			defer iter.Close()
+
+			// compute start
+			start := t.makeKey("")
+
+			// iterate over all keys
+			for iter.Seek(start); iter.Valid(); iter.Next() {
+				// parse positions
+				var positions []uint64
+				var err error
+				err = iter.Item().Value(func(val []byte) error {
+					positions, err = DecodeSequences(val)
+					return err
+				})
+				if err != nil {
+					return err
+				}
+
+				// continue if empty
+				if len(positions) == 0 {
+					continue
+				}
+
+				// cache positions
+				t.cache.Store(string(iter.Item().Key()[len(t.prefix):]), positions)
+			}
+
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Set will write the specified positions to the table.
-func (m *Table) Set(name string, positions []uint64) error {
+func (t *Table) Set(name string, positions []uint64) error {
+	// ignore empty positions
+	if len(positions) == 0 {
+		return nil
+	}
+
 	// set entry
-	err := retryUpdate(m.db, func(txn *badger.Txn) error {
+	err := retryUpdate(t.db, func(txn *badger.Txn) error {
 		return txn.SetEntry(&badger.Entry{
-			Key:   m.makeKey(name),
+			Key:   t.makeKey(name),
 			Value: EncodeSequences(positions),
 		})
 	})
@@ -47,18 +120,34 @@ func (m *Table) Set(name string, positions []uint64) error {
 		return err
 	}
 
+	// update cache if available
+	if t.cache != nil {
+		t.cache.Store(name, positions)
+	}
+
 	return nil
 }
 
 // Get will read the specified positions from the table.
-func (m *Table) Get(name string) ([]uint64, error) {
+func (t *Table) Get(name string) ([]uint64, error) {
+	// get positions from cache if available
+	if t.cache != nil {
+		value, ok := t.cache.Load(name)
+		if !ok {
+			return nil, nil
+		}
+
+		// coerce value
+		return value.([]uint64), nil
+	}
+
 	// prepare positions
 	var positions []uint64
 
-	// read entries
-	err := m.db.View(func(txn *badger.Txn) error {
+	// read positions
+	err := t.db.View(func(txn *badger.Txn) error {
 		// get item
-		item, err := txn.Get(m.makeKey(name))
+		item, err := txn.Get(t.makeKey(name))
 		if err == badger.ErrKeyNotFound {
 			return nil
 		} else if err != nil {
@@ -84,26 +173,36 @@ func (m *Table) Get(name string) ([]uint64, error) {
 }
 
 // All will return a map with all stored positions.
-func (m *Table) All() (map[string][]uint64, error) {
+func (t *Table) All() (map[string][]uint64, error) {
 	// prepare table
 	table := make(map[string][]uint64)
 
-	// iterate over all keys
-	err := m.db.View(func(txn *badger.Txn) error {
+	// get positions from cache if available
+	if t.cache != nil {
+		t.cache.Range(func(key, value interface{}) bool {
+			table[key.(string)] = value.([]uint64)
+			return true
+		})
+
+		return table, nil
+	}
+
+	// read positions from database
+	err := t.db.View(func(txn *badger.Txn) error {
 		// prepare options
 		opts := badger.DefaultIteratorOptions
-		opts.Prefix = m.prefix
+		opts.Prefix = t.prefix
 
 		// create iterator
 		iter := txn.NewIterator(badger.IteratorOptions{
-			Prefix:         m.prefix,
+			Prefix:         t.prefix,
 			PrefetchValues: true,
 			PrefetchSize:   100,
 		})
 		defer iter.Close()
 
 		// compute start
-		start := m.makeKey("")
+		start := t.makeKey("")
 
 		// iterate over all keys
 		for iter.Seek(start); iter.Valid(); iter.Next() {
@@ -119,7 +218,7 @@ func (m *Table) All() (map[string][]uint64, error) {
 			}
 
 			// set positions
-			table[string(iter.Item().Key()[len(m.prefix):])] = positions
+			table[string(iter.Item().Key()[len(t.prefix):])] = positions
 		}
 
 		return nil
@@ -131,74 +230,77 @@ func (m *Table) All() (map[string][]uint64, error) {
 	return table, nil
 }
 
-// Delete will remove the specified position from the table.
-func (m *Table) Delete(name string) error {
+// Delete will remove the specified positions from the table.
+func (t *Table) Delete(name string) error {
 	// delete item
-	err := retryUpdate(m.db, func(txn *badger.Txn) error {
-		return txn.Delete(m.makeKey(name))
+	err := retryUpdate(t.db, func(txn *badger.Txn) error {
+		return txn.Delete(t.makeKey(name))
 	})
 	if err != nil {
 		return err
 	}
 
-	return nil
-}
-
-// Count will return the number of stored positions.
-func (m *Table) Count() (int, error) {
-	// prepare counter
-	var counter int
-
-	// iterate over all keys
-	err := m.db.View(func(txn *badger.Txn) error {
-		// create iterator (key only)
-		iter := txn.NewIterator(badger.IteratorOptions{
-			Prefix: m.prefix,
-		})
-		defer iter.Close()
-
-		// compute start
-		start := m.makeKey("")
-
-		// iterate over all keys and increment counter
-		for iter.Seek(start); iter.Valid(); iter.Next() {
-			counter++
-		}
-
-		return nil
-	})
-	if err != nil {
-		return 0, err
+	// update cache if available
+	if t.cache != nil {
+		t.cache.Delete(name)
 	}
 
-	return counter, nil
+	return nil
 }
 
 // Range will return the range of stored positions and whether there are any
 // stored positions at all.
-func (m *Table) Range() (uint64, uint64, bool, error) {
+func (t *Table) Range() (uint64, uint64, bool, error) {
 	// prepare counter
 	var min, max uint64
 
 	// prepare flag
 	var found bool
 
-	// iterate over all keys
-	err := m.db.View(func(txn *badger.Txn) error {
+	// get position range from cache if available
+	if t.cache != nil {
+		t.cache.Range(func(key, value interface{}) bool {
+			// coerce positions
+			positions := value.([]uint64)
+
+			// continue if empty
+			if len(positions) == 0 {
+				return true
+			}
+
+			// set min
+			if min == 0 || positions[0] < min {
+				min = positions[0]
+			}
+
+			// set max
+			if max == 0 || positions[len(positions)-1] > max {
+				max = positions[len(positions)-1]
+			}
+
+			// set flag
+			found = true
+
+			return true
+		})
+	}
+
+	// read positions range from database
+	err := t.db.View(func(txn *badger.Txn) error {
 		// prepare options
 		opts := badger.DefaultIteratorOptions
-		opts.Prefix = m.prefix
+		opts.Prefix = t.prefix
 
 		// create iterator
 		iter := txn.NewIterator(badger.IteratorOptions{
-			Prefix:         m.prefix,
+			Prefix:         t.prefix,
 			PrefetchValues: true,
 			PrefetchSize:   100,
 		})
 		defer iter.Close()
 
 		// compute start
-		start := m.makeKey("")
+		start := t.makeKey("")
 
 		// iterate over all keys
 		for iter.Seek(start); iter.Valid(); iter.Next() {
@@ -244,17 +346,22 @@ func (m *Table) Range() (uint64, uint64, bool, error) {
 // Clear will drop all stored positions. Clear will temporarily block concurrent
 // writes and deletes and lock the underlying database. Other users uf the same
 // database may receive errors due to the locked database.
-func (m *Table) Clear() error {
+func (t *Table) Clear() error {
 	// drop all entries
-	err := m.db.DropPrefix(m.prefix)
+	err := t.db.DropPrefix(t.prefix)
 	if err != nil {
 		return err
+	}
+
+	// reset cache if available
+	if t.cache != nil {
+		t.cache = new(sync.Map)
 	}
 
 	return nil
 }
 
-func (m *Table) makeKey(name string) []byte {
-	b := make([]byte, 0, len(m.prefix)+len(name))
-	return append(append(b, m.prefix...), []byte(name)...)
+func (t *Table) makeKey(name string) []byte {
+	b := make([]byte, 0, len(t.prefix)+len(name))
+	return append(append(b, t.prefix...), []byte(name)...)
 }
