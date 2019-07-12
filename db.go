@@ -34,6 +34,9 @@ type DBConfig struct {
 	// The interval of the garbage collector.
 	GCInterval time.Duration
 
+	// The target ratio of the garbage collector.
+	GCRatio float64
+
 	// The callback that receives garbage collector errors.
 	GCErrors func(error)
 
@@ -47,6 +50,11 @@ func OpenDB(directory string, config DBConfig) (*DB, func(), error) {
 	// check directory
 	if directory == "" {
 		panic("quasar: missing directory")
+	}
+
+	// set default gc ratio
+	if config.GCRatio == 0 {
+		config.GCRatio = 0.5
 	}
 
 	// ensure directory
@@ -110,7 +118,7 @@ func OpenDB(directory string, config DBConfig) (*DB, func(), error) {
 				}
 
 				// run gc
-				err = db.RunValueLogGC(0.75)
+				err = db.RunValueLogGC(config.GCRatio)
 				if err == badger.ErrRejected {
 					continue
 				} else if err != nil && err != badger.ErrNoRewrite && config.GCErrors != nil {
