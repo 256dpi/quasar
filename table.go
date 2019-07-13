@@ -18,8 +18,8 @@ type Table struct {
 	db     *DB
 	config TableConfig
 	prefix []byte
-	cache  *sync.Map
-	mutex  sync.RWMutex
+	cache  map[string][]uint64
+	mutex  sync.Mutex
 }
 
 // CreateTable will create a table that stores position markers.
@@ -38,7 +38,7 @@ func CreateTable(db *DB, config TableConfig) (*Table, error) {
 
 	// set cache
 	if config.Cache {
-		t.cache = new(sync.Map)
+		t.cache = make(map[string][]uint64)
 	}
 
 	// init table
@@ -74,7 +74,7 @@ func (t *Table) init() error {
 			}
 
 			// cache positions
-			t.cache.Store(string(iter.Key().Data()[len(t.prefix):]), positions)
+			t.cache[string(iter.Key().Data()[len(t.prefix):])] = positions
 		}
 
 		// check errors
@@ -90,8 +90,8 @@ func (t *Table) init() error {
 // Set will write the specified positions to the table.
 func (t *Table) Set(name string, positions []uint64) error {
 	// acquire mutex
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
 	// ignore empty positions
 	if len(positions) == 0 {
@@ -106,7 +106,7 @@ func (t *Table) Set(name string, positions []uint64) error {
 
 	// update cache if available
 	if t.cache != nil {
-		t.cache.Store(name, positions)
+		t.cache[name] = positions
 	}
 
 	return nil
@@ -115,18 +115,17 @@ func (t *Table) Set(name string, positions []uint64) error {
 // Get will read the specified positions from the table.
 func (t *Table) Get(name string) ([]uint64, error) {
 	// acquire mutex
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
 	// get positions from cache if available
 	if t.cache != nil {
-		value, ok := t.cache.Load(name)
+		value, ok := t.cache[name]
 		if !ok {
 			return nil, nil
 		}
 
-		// coerce value
-		return value.([]uint64), nil
+		return value, nil
 	}
 
 	// read positions
@@ -147,18 +146,17 @@ func (t *Table) Get(name string) ([]uint64, error) {
 // All will return a map with all stored positions.
 func (t *Table) All() (map[string][]uint64, error) {
 	// acquire mutex
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
 	// prepare table
 	table := make(map[string][]uint64)
 
 	// get positions from cache if available
 	if t.cache != nil {
-		t.cache.Range(func(key, value interface{}) bool {
-			table[key.(string)] = value.([]uint64)
-			return true
-		})
+		for name, positions := range t.cache {
+			table[name] = positions
+		}
 
 		return table, nil
 	}
@@ -194,8 +192,8 @@ func (t *Table) All() (map[string][]uint64, error) {
 // Delete will remove the specified positions from the table.
 func (t *Table) Delete(name string) error {
 	// acquire mutex
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
 	// delete item
 	err := t.db.Delete(defaultWriteOptions, t.makeKey(name))
@@ -205,7 +203,7 @@ func (t *Table) Delete(name string) error {
 
 	// update cache if available
 	if t.cache != nil {
-		t.cache.Delete(name)
+		delete(t.cache, name)
 	}
 
 	return nil
@@ -215,8 +213,8 @@ func (t *Table) Delete(name string) error {
 // stored positions at all.
 func (t *Table) Range() (uint64, uint64, bool, error) {
 	// acquire mutex
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
 	// prepare counter
 	var min, max uint64
@@ -227,13 +225,10 @@ func (t *Table) Range() (uint64, uint64, bool, error) {
 	// get position range from cache if available
 	if t.cache != nil {
 		// iterate through all entries
-		t.cache.Range(func(key, value interface{}) bool {
-			// coerce positions
-			positions := value.([]uint64)
-
+		for _, positions := range t.cache {
 			// continue if empty
 			if len(positions) == 0 {
-				return true
+				continue
 			}
 
 			// set min
@@ -248,9 +243,7 @@ func (t *Table) Range() (uint64, uint64, bool, error) {
 
 			// set flag
 			found = true
-
-			return true
-		})
+		}
 
 		return min, max, found, nil
 	}

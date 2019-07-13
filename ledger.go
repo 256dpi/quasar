@@ -10,8 +10,6 @@ import (
 	"github.com/tecbot/gorocksdb"
 )
 
-const maxBatchEntries = 1000
-
 // ErrNotMonotonic is returned for write attempts that are not monotonic.
 var ErrNotMonotonic = errors.New("not monotonic")
 
