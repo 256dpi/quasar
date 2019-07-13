@@ -3,6 +3,8 @@ package quasar
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/petermattis/pebble"
 )
 
 func openDB(clear bool) *DB {
@@ -31,7 +33,7 @@ func openDB(clear bool) *DB {
 
 func set(db *DB, key, value string) {
 	// set entry
-	err := db.Put(defaultWriteOptions, []byte(key), []byte(value))
+	err := db.Set([]byte(key), []byte(value), defaultWriteOptions)
 	if err != nil {
 		panic(err)
 	}
@@ -42,16 +44,16 @@ func dump(db *DB) map[string]string {
 	data := map[string]string{}
 
 	// create iterator
-	iter := db.NewIterator(defaultReadOptions)
+	iter := db.NewIter(&pebble.IterOptions{})
 	defer iter.Close()
 
 	// read all keys
-	for iter.SeekToFirst(); iter.Valid(); iter.Next() {
-		data[string(iter.Key().Data())] = string(iter.Value().Data())
+	for iter.SeekGE(nil); iter.Valid(); iter.Next() {
+		data[string(iter.Key())] = string(iter.Value())
 	}
 
 	// check errors
-	err := iter.Err()
+	err := iter.Error()
 	if err != nil {
 		panic(err)
 	}

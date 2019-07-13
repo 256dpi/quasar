@@ -3,19 +3,13 @@ package quasar
 import (
 	"os"
 
-	"github.com/tecbot/gorocksdb"
+	"github.com/petermattis/pebble"
 )
 
-var defaultReadOptions = gorocksdb.NewDefaultReadOptions()
-var defaultWriteOptions = gorocksdb.NewDefaultWriteOptions()
-
-func init() {
-	defaultReadOptions.SetFillCache(false)
-	defaultWriteOptions.SetSync(true)
-}
+var defaultWriteOptions = pebble.NoSync
 
 // DB is a generic database.
-type DB = gorocksdb.DB
+type DB = pebble.DB
 
 // OpenDB will open or create the specified db. A function is returned that must
 // be called before closing the returned db to close the GC routine.
@@ -31,24 +25,8 @@ func OpenDB(directory string) (*DB, error) {
 		return nil, err
 	}
 
-	// prepare options
-	opts := gorocksdb.NewDefaultOptions()
-	opts.SetCreateIfMissing(true)
-	opts.SetUseFsync(true)
-	opts.SetBytesPerSync(1048576)
-	opts.SetMaxBackgroundCompactions(4)
-	opts.SetMaxBackgroundFlushes(2)
-
-	// use block based tables
-	bbt := gorocksdb.NewDefaultBlockBasedTableOptions()
-	bbt.SetBlockSize(16 * 1024)
-	bbt.SetCacheIndexAndFilterBlocks(true)
-	bbt.SetBlockCache(gorocksdb.NewLRUCache(128 << 20))
-	bbt.SetPinL0FilterAndIndexBlocksInCache(true)
-	opts.SetBlockBasedTableFactory(bbt)
-
 	// open db
-	db, err := gorocksdb.OpenDb(opts, directory)
+	db, err := pebble.Open(directory, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,8 @@ package quasar
 
 import (
 	"sync"
+
+	"github.com/petermattis/pebble"
 )
 
 // TableConfig is used to configure a table.
@@ -54,16 +56,16 @@ func (t *Table) init() error {
 	// load existing positions if cache is available
 	if t.cache != nil {
 		// create iterator
-		iter := t.db.NewIterator(defaultReadOptions)
+		iter := t.db.NewIter(prefixIterator(t.prefix))
 		defer iter.Close()
 
 		// compute start
 		start := t.makeKey("")
 
 		// read all keys
-		for iter.Seek(start); iter.ValidForPrefix(t.prefix); iter.Next() {
+		for iter.SeekGE(start); iter.Valid(); iter.Next() {
 			// parse positions
-			positions, err := DecodeSequences(iter.Value().Data())
+			positions, err := DecodeSequences(iter.Value())
 			if err != nil {
 				return err
 			}
@@ -74,11 +76,11 @@ func (t *Table) init() error {
 			}
 
 			// cache positions
-			t.cache[string(iter.Key().Data()[len(t.prefix):])] = positions
+			t.cache[string(iter.Key()[len(t.prefix):])] = positions
 		}
 
 		// check errors
-		err := iter.Err()
+		err := iter.Error()
 		if err != nil {
 			return err
 		}
@@ -99,7 +101,7 @@ func (t *Table) Set(name string, positions []uint64) error {
 	}
 
 	// set entry
-	err := t.db.Put(defaultWriteOptions, t.makeKey(name), EncodeSequences(positions))
+	err := t.db.Set(t.makeKey(name), EncodeSequences(positions), defaultWriteOptions)
 	if err != nil {
 		return err
 	}
@@ -129,13 +131,15 @@ func (t *Table) Get(name string) ([]uint64, error) {
 	}
 
 	// read positions
-	item, err := t.db.Get(defaultReadOptions, t.makeKey(name))
-	if err != nil {
+	value, err := t.db.Get(t.makeKey(name))
+	if err == pebble.ErrNotFound {
+		return []uint64{}, nil
+	} else if err != nil {
 		return nil, err
 	}
 
 	// parse key
-	positions, err := DecodeSequences(item.Data())
+	positions, err := DecodeSequences(value)
 	if err != nil {
 		return nil, err
 	}
@@ -162,26 +166,26 @@ func (t *Table) All() (map[string][]uint64, error) {
 	}
 
 	// create iterator
-	iter := t.db.NewIterator(defaultReadOptions)
+	iter := t.db.NewIter(prefixIterator(t.prefix))
 	defer iter.Close()
 
 	// compute start
 	start := t.makeKey("")
 
 	// read all keys
-	for iter.Seek(start); iter.ValidForPrefix(t.prefix); iter.Next() {
+	for iter.SeekGE(start); iter.Valid(); iter.Next() {
 		// parse positions
-		positions, err := DecodeSequences(iter.Value().Data())
+		positions, err := DecodeSequences(iter.Value())
 		if err != nil {
 			return nil, err
 		}
 
 		// set positions
-		table[string(iter.Key().Data()[len(t.prefix):])] = positions
+		table[string(iter.Key()[len(t.prefix):])] = positions
 	}
 
 	// check errors
-	err := iter.Err()
+	err := iter.Error()
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +200,7 @@ func (t *Table) Delete(name string) error {
 	defer t.mutex.Unlock()
 
 	// delete item
-	err := t.db.Delete(defaultWriteOptions, t.makeKey(name))
+	err := t.db.Delete(t.makeKey(name), defaultWriteOptions)
 	if err != nil {
 		return err
 	}
@@ -249,16 +253,16 @@ func (t *Table) Range() (uint64, uint64, bool, error) {
 	}
 
 	// create iterator
-	iter := t.db.NewIterator(defaultReadOptions)
+	iter := t.db.NewIter(prefixIterator(t.prefix))
 	defer iter.Close()
 
 	// compute start
 	start := t.makeKey("")
 
 	// read all keys
-	for iter.Seek(start); iter.ValidForPrefix(t.prefix); iter.Next() {
+	for iter.SeekGE(start); iter.Valid(); iter.Next() {
 		// parse positions
-		positions, err := DecodeSequences(iter.Value().Data())
+		positions, err := DecodeSequences(iter.Value())
 		if err != nil {
 			return 0, 0, false, err
 		}
@@ -283,7 +287,7 @@ func (t *Table) Range() (uint64, uint64, bool, error) {
 	}
 
 	// check errors
-	err := iter.Err()
+	err := iter.Error()
 	if err != nil {
 		return 0, 0, false, err
 	}

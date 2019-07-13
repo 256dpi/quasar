@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/tecbot/gorocksdb"
+	"github.com/petermattis/pebble"
 )
 
 // ErrNotMonotonic is returned for write attempts that are not monotonic.
@@ -99,19 +99,19 @@ func (l *Ledger) init() error {
 	var head uint64
 
 	// create iterator
-	iter := l.db.NewIterator(defaultReadOptions)
+	iter := l.db.NewIter(prefixIterator(l.entryPrefix))
 	defer iter.Close()
 
 	// compute start
 	start := l.makeEntryKey(0)
 
 	// read all entries
-	for iter.Seek(start); iter.ValidForPrefix(l.entryPrefix); iter.Next() {
+	for iter.SeekGE(start); iter.Valid(); iter.Next() {
 		// increment length
 		length++
 
 		// parse key
-		seq, err := DecodeSequence(iter.Key().Data()[len(l.entryPrefix):])
+		seq, err := DecodeSequence(iter.Key()[len(l.entryPrefix):])
 		if err != nil {
 			return err
 		}
@@ -122,8 +122,8 @@ func (l *Ledger) init() error {
 		// cache entry
 		if l.cache != nil {
 			// prepare value
-			value := make([]byte, iter.Value().Size())
-			copy(value, iter.Value().Data())
+			value := make([]byte, len(iter.Value()))
+			copy(value, iter.Value())
 
 			// store entry
 			l.cache.Push(Entry{
@@ -134,7 +134,7 @@ func (l *Ledger) init() error {
 	}
 
 	// check errors
-	err := iter.Err()
+	err := iter.Error()
 	if err != nil {
 		return err
 	}
@@ -142,15 +142,15 @@ func (l *Ledger) init() error {
 	// read stored head if collapsed
 	if length <= 0 {
 		// read stored head
-		item, err := l.db.Get(defaultReadOptions, l.makeFieldKey("head"))
-		if err != nil {
+		value, err := l.db.Get(l.makeFieldKey("head"))
+		if err != nil && err != pebble.ErrNotFound {
 			return err
 		}
 
 		// parse if present
-		if item.Exists() {
+		if value != nil {
 			// parse length
-			head, err = DecodeSequence(item.Data())
+			head, err = DecodeSequence(value)
 			if err != nil {
 				return err
 			}
@@ -193,19 +193,24 @@ func (l *Ledger) Write(entries ...Entry) error {
 	}
 
 	// prepare batch
-	batch := gorocksdb.NewWriteBatch()
-	defer batch.Destroy()
+	batch := l.db.NewBatch()
 
 	// add all entries
 	for _, entry := range entries {
-		batch.Put(l.makeEntryKey(entry.Sequence), entry.Payload)
+		err := batch.Set(l.makeEntryKey(entry.Sequence), entry.Payload, defaultWriteOptions)
+		if err != nil {
+			return err
+		}
 	}
 
 	// add head
-	batch.Put(l.makeFieldKey("head"), []byte(strconv.FormatUint(head, 10)))
+	err := batch.Set(l.makeFieldKey("head"), []byte(strconv.FormatUint(head, 10)), defaultWriteOptions)
+	if err != nil {
+		return err
+	}
 
 	// perform write
-	err := l.db.Write(defaultWriteOptions, batch)
+	err = batch.Commit(defaultWriteOptions)
 	if err != nil {
 		return err
 	}
@@ -273,20 +278,20 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 	}
 
 	// create iterator
-	iter := l.db.NewIterator(defaultReadOptions)
+	iter := l.db.NewIter(prefixIterator(l.entryPrefix))
 	defer iter.Close()
 
 	// compute start
 	start := l.makeEntryKey(sequence)
 
 	// read all keys
-	for iter.Seek(start); iter.ValidForPrefix(l.entryPrefix) && len(list) < amount; iter.Next() {
+	for iter.SeekGE(start); iter.Valid() && len(list) < amount; iter.Next() {
 		// prepare value
-		value := make([]byte, iter.Value().Size())
-		copy(value, iter.Value().Data())
+		value := make([]byte, len(iter.Value()))
+		copy(value, iter.Value())
 
 		// parse key
-		seq, err := DecodeSequence(iter.Key().Data()[len(l.entryPrefix):])
+		seq, err := DecodeSequence(iter.Key()[len(l.entryPrefix):])
 		if err != nil {
 			return nil, err
 		}
@@ -299,7 +304,7 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 	}
 
 	// check errors
-	err := iter.Err()
+	err := iter.Error()
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +343,7 @@ func (l *Ledger) Index(index int) (uint64, bool, error) {
 	var existing bool
 
 	// create iterator
-	iter := l.db.NewIterator(defaultReadOptions)
+	iter := l.db.NewIter(prefixIterator(l.entryPrefix))
 	defer iter.Close()
 
 	// compute start
@@ -348,9 +353,9 @@ func (l *Ledger) Index(index int) (uint64, bool, error) {
 	}
 
 	// prepare seek
-	seek := func() { iter.Seek(start) }
+	seek := func() { iter.SeekGE(start) }
 	if backward {
-		seek = func() { iter.SeekForPrev(start) }
+		seek = func() { iter.SeekLT(start) }
 	}
 
 	// prepare next
@@ -363,14 +368,14 @@ func (l *Ledger) Index(index int) (uint64, bool, error) {
 	counter := 0
 
 	// read all keys
-	for seek(); iter.ValidForPrefix(l.entryPrefix); next() {
+	for seek(); iter.Valid(); next() {
 		// increment counter
 		counter++
 
 		// check counter
 		if counter >= (index + 1) {
 			// parse key
-			seq, err := DecodeSequence(iter.Key().Data()[len(l.entryPrefix):])
+			seq, err := DecodeSequence(iter.Key()[len(l.entryPrefix):])
 			if err != nil {
 				return 0, false, err
 			}
@@ -386,7 +391,7 @@ func (l *Ledger) Index(index int) (uint64, bool, error) {
 	}
 
 	// check errors
-	err := iter.Err()
+	err := iter.Error()
 	if err != nil {
 		return 0, false, err
 	}
@@ -433,7 +438,7 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 		})
 	} else {
 		// create iterator
-		iter := l.db.NewIterator(defaultReadOptions)
+		iter := l.db.NewIter(prefixIterator(l.entryPrefix))
 		defer iter.Close()
 
 		// compute start
@@ -443,9 +448,9 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 		needle := l.makeEntryKey(sequence)
 
 		// count all deletable entries
-		for iter.Seek(start); iter.ValidForPrefix(l.entryPrefix); iter.Next() {
+		for iter.SeekGE(start); iter.Valid(); iter.Next() {
 			// stop if key is after needle
-			if bytes.Compare(iter.Key().Data(), needle) > 0 {
+			if bytes.Compare(iter.Key(), needle) > 0 {
 				break
 			}
 
@@ -454,21 +459,23 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 		}
 
 		// check errors
-		err := iter.Err()
+		err := iter.Error()
 		if err != nil {
 			return 0, err
 		}
 	}
 
 	// prepare batch
-	batch := gorocksdb.NewWriteBatch()
-	defer batch.Destroy()
+	batch := l.db.NewBatch()
 
 	// delete entries
-	batch.DeleteRange(l.makeEntryKey(0), l.makeEntryKey(sequence+1))
+	err := batch.DeleteRange(l.makeEntryKey(0), l.makeEntryKey(sequence+1), defaultWriteOptions)
+	if err != nil {
+		return 0, err
+	}
 
 	// write batch
-	err := l.db.Write(defaultWriteOptions, batch)
+	err = batch.Commit(defaultWriteOptions)
 	if err != nil {
 		return 0, err
 	}
