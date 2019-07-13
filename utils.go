@@ -6,3 +6,8 @@ import (
 
 var defaultReadOptions = gorocksdb.NewDefaultReadOptions()
 var defaultWriteOptions = gorocksdb.NewDefaultWriteOptions()
+
+func init() {
+	defaultReadOptions.SetFillCache(false)
+	defaultWriteOptions.SetSync(true)
+}

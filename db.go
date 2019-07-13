@@ -27,11 +27,17 @@ func OpenDB(directory string) (*DB, error) {
 	opts := gorocksdb.NewDefaultOptions()
 	opts.SetCreateIfMissing(true)
 	opts.SetUseFsync(true)
+	opts.SetBytesPerSync(1048576)
+	opts.SetMaxBackgroundCompactions(4)
+	opts.SetMaxBackgroundFlushes(2)
 
 	// use block based tables
-	// bbto := gorocksdb.NewDefaultBlockBasedTableOptions()
-	// bbto.SetBlockCache(gorocksdb.NewLRUCache(3 << 30))
-	// opts.SetBlockBasedTableFactory(bbto)
+	bbt := gorocksdb.NewDefaultBlockBasedTableOptions()
+	bbt.SetBlockSize(16 * 1024)
+	bbt.SetCacheIndexAndFilterBlocks(true)
+	bbt.SetBlockCache(gorocksdb.NewLRUCache(128 << 20))
+	bbt.SetPinL0FilterAndIndexBlocksInCache(true)
+	opts.SetBlockBasedTableFactory(bbt)
 
 	// open db
 	db, err := gorocksdb.OpenDb(opts, directory)
