@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/petermattis/pebble"
+	"github.com/petermattis/pebble/cache"
 )
 
 var defaultWriteOptions = pebble.NoSync
@@ -26,7 +27,19 @@ func OpenDB(directory string) (*DB, error) {
 	}
 
 	// open db
-	db, err := pebble.Open(directory, nil)
+	db, err := pebble.Open(directory, &pebble.Options{
+		Cache:                       cache.New(128 << 20), // 128MB
+		MemTableSize:                64 << 20,             // 64MB
+		MemTableStopWritesThreshold: 4,
+		MinFlushRate:                4 << 20, // 4MB
+		L0CompactionThreshold:       2,
+		L0StopWritesThreshold:       32,
+		LBaseMaxBytes:               64 << 20, // 64MB
+		Levels: []pebble.LevelOptions{{
+			BlockSize: 32 << 10, // 32KB
+		}},
+		EventListener: pebble.MakeLoggingEventListener(nil),
+	})
 	if err != nil {
 		return nil, err
 	}
