@@ -48,9 +48,6 @@ type Ledger struct {
 	db     *DB
 	config LedgerConfig
 
-	ro *gorocksdb.ReadOptions
-	wo *gorocksdb.WriteOptions
-
 	cache       *Buffer
 	entryPrefix []byte
 	fieldPrefix []byte
@@ -83,8 +80,6 @@ func CreateLedger(db *DB, config LedgerConfig) (*Ledger, error) {
 	l := &Ledger{
 		db:          db,
 		config:      config,
-		ro:          gorocksdb.NewDefaultReadOptions(),
-		wo:          gorocksdb.NewDefaultWriteOptions(),
 		cache:       cache,
 		entryPrefix: append([]byte(config.Prefix), '#'),
 		fieldPrefix: append([]byte(config.Prefix), '!'),
@@ -152,7 +147,7 @@ func (l *Ledger) init() error {
 	// read stored head if collapsed
 	if length <= 0 {
 		// read stored head
-		item, err := l.db.Get(l.ro, l.makeFieldKey("head"))
+		item, err := l.db.Get(defaultReadOptions, l.makeFieldKey("head"))
 		if err != nil {
 			return err
 		}
@@ -217,7 +212,7 @@ func (l *Ledger) Write(entries ...Entry) error {
 	batch.Put(l.makeFieldKey("head"), []byte(strconv.FormatUint(head, 10)))
 
 	// perform write
-	err := l.db.Write(l.wo, batch)
+	err := l.db.Write(defaultWriteOptions, batch)
 	if err != nil {
 		return err
 	}
@@ -507,7 +502,7 @@ func (l *Ledger) uncachedDelete(sequence uint64) (int, error) {
 	batch.DeleteRange(start, l.makeEntryKey(sequence+1))
 
 	// write batch
-	err = l.db.Write(l.wo, batch)
+	err = l.db.Write(defaultWriteOptions, batch)
 	if err != nil {
 		return 0, err
 	}
@@ -540,7 +535,7 @@ func (l *Ledger) cachedDelete(sequence uint64) (int, error) {
 	batch.DeleteRange(l.makeEntryKey(0), l.makeEntryKey(sequence+1))
 
 	// write batch
-	err := l.db.Write(l.wo, batch)
+	err := l.db.Write(defaultWriteOptions, batch)
 	if err != nil {
 		return 0, err
 	}
