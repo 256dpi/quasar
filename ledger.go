@@ -52,7 +52,7 @@ type Ledger struct {
 	entryPrefix []byte
 	fieldPrefix []byte
 
-	receivers map[chan<- uint64]chan<- uint64
+	receivers map[chan<- uint64]struct{}
 
 	length int
 	head   uint64
@@ -81,7 +81,7 @@ func CreateLedger(db *DB, config LedgerConfig) (*Ledger, error) {
 		cache:       cache,
 		entryPrefix: append([]byte(config.Prefix), '#'),
 		fieldPrefix: append([]byte(config.Prefix), '!'),
-		receivers:   make(map[chan<- uint64]chan<- uint64),
+		receivers:   make(map[chan<- uint64]struct{}),
 	}
 
 	// init ledger
@@ -514,7 +514,7 @@ func (l *Ledger) Subscribe(receiver chan<- uint64) {
 	defer l.mutex.Unlock()
 
 	// store receiver
-	l.receivers[receiver] = receiver
+	l.receivers[receiver] = struct{}{}
 }
 
 // Unsubscribe will remove a previously subscribed receiver.
