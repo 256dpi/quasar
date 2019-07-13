@@ -411,101 +411,54 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 		sequence = l.head
 	}
 
-	// we can do a fast delete if the ledger is fully cached
-	fast := l.config.Cache > 0 && l.config.Limit > 0 && l.config.Cache >= l.config.Limit
+	// prepare counter
+	var counter int
 
-	// prepare values
-	var n int
-	var err error
+	// determine if ledger is fully cached
+	fullyCached := l.config.Cache > 0 && l.config.Limit > 0 && l.config.Cache >= l.config.Limit
 
-	// perform delete
-	if fast {
-		n, err = l.cachedDelete(sequence)
-	} else {
-		n, err = l.uncachedDelete(sequence)
-	}
+	// count entries from index or database
+	if fullyCached {
+		// read from cache
+		l.cache.Scan(func(entry Entry) bool {
+			// check if done
+			if entry.Sequence > sequence {
+				return false
+			}
 
-	// check error
-	if err != nil {
-		return 0, err
-	}
+			// increment counter
+			counter++
 
-	// decrement length
-	l.length -= n
-
-	// remove deleted entries from cache
-	if l.cache != nil {
-		l.cache.Trim(func(entry Entry) bool {
-			return entry.Sequence <= sequence
+			return true
 		})
-	}
+	} else {
+		// create iterator
+		iter := l.db.NewIterator(defaultReadOptions)
+		defer iter.Close()
 
-	return n, nil
-}
+		// compute start
+		start := l.makeEntryKey(0)
 
-func (l *Ledger) uncachedDelete(sequence uint64) (int, error) {
-	// create iterator
-	iter := l.db.NewIterator(defaultReadOptions)
-	defer iter.Close()
+		// compute needle
+		needle := l.makeEntryKey(sequence)
 
-	// compute start
-	start := l.makeEntryKey(0)
+		// count all deletable entries
+		for iter.Seek(start); iter.ValidForPrefix(l.entryPrefix); iter.Next() {
+			// stop if key is after needle
+			if bytes.Compare(iter.Key().Data(), needle) > 0 {
+				break
+			}
 
-	// compute needle
-	needle := l.makeEntryKey(sequence)
-
-	// prepare counter
-	var counter int
-
-	// count all deletable entries
-	for iter.Seek(start); iter.ValidForPrefix(l.entryPrefix); iter.Next() {
-		// stop if key is after needle
-		if bytes.Compare(iter.Key().Data(), needle) > 0 {
-			break
+			// increment counter
+			counter++
 		}
 
-		// increment counter
-		counter++
-	}
-
-	// check errors
-	err := iter.Err()
-	if err != nil {
-		return 0, err
-	}
-
-	// prepare batch
-	batch := gorocksdb.NewWriteBatch()
-	defer batch.Destroy()
-
-	// add range delete
-	batch.DeleteRange(start, l.makeEntryKey(sequence+1))
-
-	// write batch
-	err = l.db.Write(defaultWriteOptions, batch)
-	if err != nil {
-		return 0, err
-	}
-
-	return counter, nil
-}
-
-func (l *Ledger) cachedDelete(sequence uint64) (int, error) {
-	// prepare counter
-	var counter int
-
-	// read from cache
-	l.cache.Scan(func(entry Entry) bool {
-		// check if done
-		if entry.Sequence > sequence {
-			return false
+		// check errors
+		err := iter.Err()
+		if err != nil {
+			return 0, err
 		}
-
-		// increment counter
-		counter++
-
-		return true
-	})
+	}
 
 	// prepare batch
 	batch := gorocksdb.NewWriteBatch()
@@ -518,6 +471,16 @@ func (l *Ledger) cachedDelete(sequence uint64) (int, error) {
 	err := l.db.Write(defaultWriteOptions, batch)
 	if err != nil {
 		return 0, err
+	}
+
+	// decrement length
+	l.length -= counter
+
+	// remove deleted entries from cache
+	if l.cache != nil {
+		l.cache.Trim(func(entry Entry) bool {
+			return entry.Sequence <= sequence
+		})
 	}
 
 	return counter, nil
