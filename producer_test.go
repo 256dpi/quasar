@@ -9,6 +9,7 @@ import (
 
 func TestProducer(t *testing.T) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -41,13 +42,11 @@ func TestProducer(t *testing.T) {
 
 	length := ledger.Length()
 	assert.Equal(t, 20, length)
-
-	err = db.Close()
-	assert.NoError(t, err)
 }
 
 func TestProducerFilter(t *testing.T) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -100,13 +99,11 @@ func TestProducerFilter(t *testing.T) {
 
 	length := ledger.Length()
 	assert.Equal(t, 20, length)
-
-	err = db.Close()
-	assert.NoError(t, err)
 }
 
 func TestProducerCancel(t *testing.T) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -127,13 +124,11 @@ func TestProducerCancel(t *testing.T) {
 	producer.Close()
 
 	<-done
-
-	err = db.Close()
-	assert.NoError(t, err)
 }
 
 func TestProducerRetry(t *testing.T) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Limit: 10})
 	assert.NoError(t, err)
@@ -180,12 +175,11 @@ func TestProducerRetry(t *testing.T) {
 
 	producer.Close()
 
-	err = db.Close()
-	assert.NoError(t, err)
 }
 
 func BenchmarkProducer(b *testing.B) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	if err != nil {
@@ -223,9 +217,4 @@ func BenchmarkProducer(b *testing.B) {
 	b.StopTimer()
 
 	producer.Close()
-
-	err = db.Close()
-	if err != nil {
-		panic(err)
-	}
 }

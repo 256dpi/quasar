@@ -7,8 +7,10 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/dgraph-io/badger"
+	"github.com/tecbot/gorocksdb"
 )
+
+const maxBatchEntries = 1000
 
 // ErrNotMonotonic is returned for write attempts that are not monotonic.
 var ErrNotMonotonic = errors.New("not monotonic")
@@ -48,6 +50,9 @@ type Ledger struct {
 	db     *DB
 	config LedgerConfig
 
+	ro *gorocksdb.ReadOptions
+	wo *gorocksdb.WriteOptions
+
 	cache       *Buffer
 	entryPrefix []byte
 	fieldPrefix []byte
@@ -80,6 +85,8 @@ func CreateLedger(db *DB, config LedgerConfig) (*Ledger, error) {
 	l := &Ledger{
 		db:          db,
 		config:      config,
+		ro:          gorocksdb.NewDefaultReadOptions(),
+		wo:          gorocksdb.NewDefaultWriteOptions(),
 		cache:       cache,
 		entryPrefix: append([]byte(config.Prefix), '#'),
 		fieldPrefix: append([]byte(config.Prefix), '!'),
@@ -99,74 +106,67 @@ func (l *Ledger) init() error {
 	var length int
 	var head uint64
 
-	// read length, head and preload cache if available
-	err := l.db.View(func(txn *badger.Txn) error {
-		// create iterator
-		iter := txn.NewIterator(badger.IteratorOptions{
-			Prefix:         l.entryPrefix,
-			PrefetchValues: l.cache != nil,
-			PrefetchSize:   100,
-		})
-		defer iter.Close()
+	// prepare opts
+	opts := gorocksdb.NewDefaultReadOptions()
+	defer opts.Destroy()
 
-		// compute start
-		start := l.makeEntryKey(0)
+	// iterate over all keys
+	iter := l.db.NewIterator(opts)
+	defer iter.Close()
 
-		// iterate over all keys
-		for iter.Seek(start); iter.Valid(); iter.Next() {
-			// increment length
-			length++
+	// compute start
+	start := l.makeEntryKey(0)
 
-			// parse key and set head
-			seq, err := DecodeSequence(iter.Item().Key()[len(l.entryPrefix):])
+	// read all keys
+	for iter.Seek(start); iter.ValidForPrefix(l.entryPrefix); iter.Next() {
+		// increment length
+		length++
+
+		// parse key and set head
+		seq, err := DecodeSequence(iter.Key().Data()[len(l.entryPrefix):])
+		if err != nil {
+			return err
+		}
+
+		// cache entry
+		if l.cache != nil {
+			// prepare value
+			value := make([]byte, iter.Value().Size())
+			copy(value, iter.Value().Data())
+
+			// store entry
+			l.cache.Push(Entry{
+				Sequence: seq,
+				Payload:  value,
+			})
+		}
+
+		// set head
+		head = seq
+	}
+
+	// check errors
+	err := iter.Err()
+	if err != nil {
+		panic(err)
+	}
+
+	// read stored head if collapsed
+	if length <= 0 {
+		// read stored head
+		item, err := l.db.Get(l.ro, l.makeFieldKey("head"))
+		if err != nil {
+			return err
+		}
+
+		// parse if present
+		if item.Exists() {
+			// parse length
+			head, err = DecodeSequence(item.Data())
 			if err != nil {
 				return err
 			}
-
-			// cache entry
-			if l.cache != nil {
-				// copy value
-				value, err := iter.Item().ValueCopy(nil)
-				if err != nil {
-					return err
-				}
-
-				// store entry
-				l.cache.Push(Entry{
-					Sequence: seq,
-					Payload:  value,
-				})
-			}
-
-			// set head
-			head = seq
 		}
-
-		// read stored head if collapsed
-		if length <= 0 {
-			// read stored head
-			item, err := txn.Get(l.makeFieldKey("head"))
-			if err != nil && err != badger.ErrKeyNotFound {
-				return err
-			}
-
-			// parse if present
-			if item != nil {
-				// parse length
-				err = item.Value(func(val []byte) error {
-					head, err = strconv.ParseUint(string(val), 10, 64)
-					return err
-				})
-				if err != nil {
-					return err
-				}
-			}
-		}
-
-		return nil
-	})
-	if err != nil {
-		return err
 	}
 
 	// set length and head
@@ -206,26 +206,20 @@ func (l *Ledger) Write(entries ...Entry) error {
 		head = entry.Sequence
 	}
 
-	// begin database update
-	err := retryUpdate(l.db, func(txn *badger.Txn) error {
-		// add all entries
-		for _, entry := range entries {
-			// add entry
-			err := txn.SetEntry(&badger.Entry{
-				Key:   l.makeEntryKey(entry.Sequence),
-				Value: entry.Payload,
-			})
-			if err != nil {
-				return err
-			}
-		}
+	// prepare batch
+	batch := gorocksdb.NewWriteBatch()
+	defer batch.Destroy()
 
-		// store head
-		return txn.SetEntry(&badger.Entry{
-			Key:   l.makeFieldKey("head"),
-			Value: []byte(strconv.FormatUint(head, 10)),
-		})
-	})
+	// add all entries
+	for _, entry := range entries {
+		batch.Put(l.makeEntryKey(entry.Sequence), entry.Payload)
+	}
+
+	// add head
+	batch.Put(l.makeFieldKey("head"), []byte(strconv.FormatUint(head, 10)))
+
+	// perform write
+	err := l.db.Write(l.wo, batch)
 	if err != nil {
 		return err
 	}
@@ -292,44 +286,40 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 		return list, nil
 	}
 
-	// read entries
-	err := l.db.View(func(txn *badger.Txn) error {
-		// create iterator
-		iter := txn.NewIterator(badger.IteratorOptions{
-			Prefix:         l.entryPrefix,
-			PrefetchValues: true,
-			PrefetchSize:   100,
-		})
-		defer iter.Close()
+	// prepare opts
+	opts := gorocksdb.NewDefaultReadOptions()
+	defer opts.Destroy()
 
-		// compute start
-		start := l.makeEntryKey(sequence)
+	// iterate over all keys
+	iter := l.db.NewIterator(opts)
+	defer iter.Close()
 
-		// iterate until enough entries have been loaded
-		for iter.Seek(start); iter.Valid() && len(list) < amount; iter.Next() {
-			// copy values
-			pld, err := iter.Item().ValueCopy(nil)
-			if err != nil {
-				return err
-			}
+	// compute start
+	start := l.makeEntryKey(sequence)
 
-			// parse key
-			seq, err := DecodeSequence(iter.Item().Key()[len(l.entryPrefix):])
-			if err != nil {
-				return err
-			}
+	// read all keys
+	for iter.Seek(start); iter.ValidForPrefix(l.entryPrefix) && len(list) < amount; iter.Next() {
+		// prepare value
+		value := make([]byte, iter.Value().Size())
+		copy(value, iter.Value().Data())
 
-			// add entry
-			list = append(list, Entry{
-				Sequence: seq,
-				Payload:  pld,
-			})
+		// parse key
+		seq, err := DecodeSequence(iter.Key().Data()[len(l.entryPrefix):])
+		if err != nil {
+			return nil, err
 		}
 
-		return nil
-	})
+		// add entry
+		list = append(list, Entry{
+			Sequence: seq,
+			Payload:  value,
+		})
+	}
+
+	// check errors
+	err := iter.Err()
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	return list, nil
@@ -361,70 +351,68 @@ func (l *Ledger) Index(index int) (uint64, bool, error) {
 	var sequence uint64
 	var existing bool
 
-	// find requested entry
-	err := l.db.View(func(txn *badger.Txn) error {
-		// read stored head
-		item, err := txn.Get(l.makeFieldKey("head"))
-		if err != nil && err != badger.ErrKeyNotFound {
-			return err
+	// prepare opts
+	opts := gorocksdb.NewDefaultReadOptions()
+	defer opts.Destroy()
+
+	// iterate over all keys
+	iter := l.db.NewIterator(opts)
+	defer iter.Close()
+
+	// compute start
+	start := l.makeEntryKey(0)
+	if backward {
+		start = l.makeEntryKey(math.MaxUint64)
+	}
+
+	// prepare seek
+	seek := func() { iter.Seek(start) }
+	if backward {
+		seek = func() { iter.SeekForPrev(start) }
+	}
+
+	// prepare next
+	next := func() { iter.Next() }
+	if backward {
+		next = func() { iter.Prev() }
+	}
+
+	// prepare counter
+	counter := 0
+
+	// read all keys
+	for seek(); iter.ValidForPrefix(l.entryPrefix); next() {
+		// otherwise parse key
+		seq, err := DecodeSequence(iter.Key().Data()[len(l.entryPrefix):])
+		if err != nil {
+			return 0, false, err
 		}
 
-		// parse stored head if present
-		if item != nil {
-			// parse length
-			err = item.Value(func(val []byte) error {
-				sequence, err = strconv.ParseUint(string(val), 10, 64)
-				return err
-			})
-			if err != nil {
-				return err
-			}
+		// set sequence
+		sequence = seq
+
+		// increment length
+		counter++
+
+		// check counter
+		if counter >= (index + 1) {
+			existing = true
+			break
 		}
+	}
 
-		// create iterator (key only)
-		iter := txn.NewIterator(badger.IteratorOptions{
-			Prefix:  l.entryPrefix,
-			Reverse: backward,
-		})
-		defer iter.Close()
-
-		// compute start
-		start := l.makeEntryKey(0)
-		if backward {
-			start = l.makeEntryKey(math.MaxUint64)
-		}
-
-		// prepare counter
-		counter := 0
-
-		// iterate over all keys
-		for iter.Seek(start); iter.Valid(); iter.Next() {
-			// otherwise parse key
-			seq, err := DecodeSequence(iter.Item().Key()[len(l.entryPrefix):])
-			if err != nil {
-				return err
-			}
-
-			// set sequence
-			sequence = seq
-
-			// increment length
-			counter++
-
-			// check counter
-			if counter >= (index + 1) {
-				existing = true
-				break
-			}
-		}
-
-		return nil
-	})
+	// check errors
+	err := iter.Err()
 	if err != nil {
 		return 0, false, err
 	}
 
-	return sequence, existing, nil
+	// check existing
+	if !existing {
+		return 0, false, nil
+	}
+
+	return sequence, true, nil
 }
 
 // Delete will remove all entries up to and including the specified sequence
@@ -447,193 +435,119 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 	// we can do a fast delete if the ledger is fully cached
 	fast := l.config.Cache > 0 && l.config.Limit > 0 && l.config.Cache >= l.config.Limit
 
+	// prepare values
+	var n int
+	var err error
+
+	// perform delete
+	if fast {
+		n, err = l.cachedDelete(sequence)
+	} else {
+		n, err = l.uncachedDelete(sequence)
+	}
+
+	// check error
+	if err != nil {
+		return 0, err
+	}
+
+	// decrement length
+	l.mutex.Lock()
+	l.length -= n
+	l.mutex.Unlock()
+
+	// remove deleted entries from cache
+	if l.cache != nil {
+		l.cache.Trim(func(entry Entry) bool {
+			return entry.Sequence <= sequence
+		})
+	}
+
+	return n, nil
+}
+
+func (l *Ledger) uncachedDelete(sequence uint64) (int, error) {
+	// prepare opts
+	opts := gorocksdb.NewDefaultReadOptions()
+	defer opts.Destroy()
+
+	// iterate over all keys
+	iter := l.db.NewIterator(opts)
+	defer iter.Close()
+
+	// compute start
+	start := l.makeEntryKey(0)
+
+	// compute needle
+	needle := l.makeEntryKey(sequence)
+
 	// prepare counter
 	var counter int
 
-	// delete in multiple attempts to honor max batch count
-	for {
-		// prepare values
-		var last uint64
-		var n int
-		var done bool
-		var err error
-
-		// perform delete
-		if fast {
-			last, n, done, err = l.fastDelete(sequence)
-		} else {
-			last, n, done, err = l.partialDelete(sequence)
-		}
-
-		// check error
-		if err != nil {
-			return counter, err
-		}
-
-		// decrement length
-		l.mutex.Lock()
-		l.length -= n
-		l.mutex.Unlock()
-
-		// remove deleted entries from cache
-		if l.cache != nil && last > 0 {
-			l.cache.Trim(func(entry Entry) bool {
-				return entry.Sequence <= last
-			})
+	// count all deletable entries
+	for iter.Seek(start); iter.ValidForPrefix(l.entryPrefix); iter.Next() {
+		// stop if key is after needle
+		if bytes.Compare(iter.Key().Data(), needle) > 0 {
+			break
 		}
 
 		// increment counter
-		counter += n
+		counter++
+	}
 
-		// check if done
-		if done {
-			break
-		}
+	// check errors
+	err := iter.Err()
+	if err != nil {
+		return 0, err
+	}
+
+	// prepare batch
+	batch := gorocksdb.NewWriteBatch()
+	defer batch.Destroy()
+
+	// add range delete
+	batch.DeleteRange(start, l.makeEntryKey(sequence+1))
+
+	// write batch
+	err = l.db.Write(l.wo, batch)
+	if err != nil {
+		return 0, err
 	}
 
 	return counter, nil
 }
 
-func (l *Ledger) partialDelete(sequence uint64) (uint64, int, bool, error) {
-	// compute needle
-	needle := l.makeEntryKey(sequence)
-
-	// prepare counter, last and done
+func (l *Ledger) cachedDelete(sequence uint64) (int, error) {
+	// prepare counter
 	var counter int
-	var last uint64
-	var done bool
 
-	// begin database update
-	err := retryUpdate(l.db, func(txn *badger.Txn) error {
-		// reset effects
-		counter = 0
-		last = 0
-		done = true
-
-		// create iterator
-		iter := txn.NewIterator(badger.IteratorOptions{
-			Prefix: l.entryPrefix,
-		})
-		defer iter.Close()
-
-		// cache last processed key
-		var lastKey []byte
-
-		// delete all entries
-		for iter.Seek(l.makeEntryKey(0)); iter.Valid(); iter.Next() {
-			// stop if key is after needle
-			if bytes.Compare(iter.Item().Key(), needle) > 0 {
-				break
-			}
-
-			// copy key
-			key := iter.Item().KeyCopy(nil)
-
-			// delete entry
-			err := txn.Delete(key)
-			if err != nil {
-				return err
-			}
-
-			// set last
-			lastKey = key
-
-			// increment counter
-			counter++
-
-			// stop if transaction is exhausted
-			if counter >= int(l.db.MaxBatchCount()-10) {
-				done = false
-				break
-			}
-		}
-
-		// get last from last key if available
-		if lastKey != nil {
-			// parse key
-			seq, err := DecodeSequence(lastKey[len(l.entryPrefix):])
-			if err != nil {
-				return err
-			}
-
-			// set last
-			last = seq
-		}
-
-		return nil
-	})
-	if err != nil {
-		return 0, 0, false, err
-	}
-
-	return last, counter, done, nil
-}
-
-func (l *Ledger) fastDelete(sequence uint64) (uint64, int, bool, error) {
-	// prepare list
-	var list []uint64
-
-	// prepare counter, last and done
-	var counter int
-	var last uint64
-	var done = true
-
-	// collect sequences from cache
+	// read from cache
 	l.cache.Scan(func(entry Entry) bool {
 		// check if done
 		if entry.Sequence > sequence {
 			return false
 		}
 
-		// add to list
-		list = append(list, entry.Sequence)
-
-		// set last
-		last = entry.Sequence
-
 		// increment counter
 		counter++
-
-		// stop if transaction is exhausted
-		if counter >= int(l.db.MaxBatchCount()-10) {
-			done = false
-			return false
-		}
 
 		return true
 	})
 
-	// allocate key arena
-	keyLen := len(l.entryPrefix) + EncodedSequenceLength
-	keyBuf := bytes.NewBuffer(make([]byte, 0, len(list)*keyLen))
+	// prepare batch
+	batch := gorocksdb.NewWriteBatch()
+	defer batch.Destroy()
 
-	// encode sequences
-	for _, seq := range list {
-		_, _ = keyBuf.Write(l.entryPrefix)
-		_ = EncodeSequenceTo(keyBuf, seq, false)
-	}
+	// delete entries
+	batch.DeleteRange(l.makeEntryKey(0), l.makeEntryKey(sequence+1))
 
-	// get buffer
-	buf := keyBuf.Bytes()
-
-	// begin database update
-	err := retryUpdate(l.db, func(txn *badger.Txn) error {
-		// delete all sequences
-		for i := range list {
-			pos := i * keyLen
-			err := txn.Delete(buf[pos : pos+keyLen])
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
+	// write batch
+	err := l.db.Write(l.wo, batch)
 	if err != nil {
-		return 0, 0, false, err
+		return 0, err
 	}
 
-	return last, counter, done, nil
+	return counter, nil
 }
 
 // Length will return the number of stored entries.
@@ -655,77 +569,6 @@ func (l *Ledger) Head() uint64 {
 	l.mutex.Unlock()
 
 	return head
-}
-
-// Clear will drop all ledger entries while maintaining the head. Clear will
-// temporarily block concurrent writes and deletes and lock the underlying
-// database. Other users uf the same database may receive errors due to the
-// locked database.
-func (l *Ledger) Clear() error {
-	// acquire delete mutex
-	l.deleteMutex.Lock()
-	defer l.deleteMutex.Unlock()
-
-	// acquire write mutex
-	l.writeMutex.Lock()
-	defer l.writeMutex.Unlock()
-
-	// drop all entries
-	err := l.db.DropPrefix(l.entryPrefix)
-	if err != nil {
-		return err
-	}
-
-	// reset cache
-	if l.cache != nil {
-		l.cache.Reset()
-	}
-
-	// reset length
-	l.mutex.Lock()
-	l.length = 0
-	l.mutex.Unlock()
-
-	return nil
-}
-
-// Reset will drop all ledger entries and reset the head. Reset will
-// temporarily block concurrent writes and deletes and lock the underlying
-// database. Other users uf the same database may receive errors due to the
-// locked database.
-func (l *Ledger) Reset() error {
-	// acquire delete mutex
-	l.deleteMutex.Lock()
-	defer l.deleteMutex.Unlock()
-
-	// acquire write mutex
-	l.writeMutex.Lock()
-	defer l.writeMutex.Unlock()
-
-	// drop entries
-	err := l.db.DropPrefix(l.entryPrefix)
-	if err != nil {
-		return err
-	}
-
-	// drop fields
-	err = l.db.DropPrefix(l.fieldPrefix)
-	if err != nil {
-		return err
-	}
-
-	// reset cache
-	if l.cache != nil {
-		l.cache.Reset()
-	}
-
-	// reset length
-	l.mutex.Lock()
-	l.length = 0
-	l.head = 0
-	l.mutex.Unlock()
-
-	return nil
 }
 
 // Subscribe will subscribe the specified channel to changes to the last

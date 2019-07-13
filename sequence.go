@@ -68,7 +68,7 @@ func EncodeSequence(s uint64, compact bool) []byte {
 	return []byte(fmt.Sprintf("%020d", s))
 }
 
-// EncodeSequence will encode a sequence to the specified writer.
+// EncodeSequenceTo will encode a sequence to the specified writer.
 func EncodeSequenceTo(w io.Writer, s uint64, compact bool) error {
 	// check compact
 	if compact {
@@ -107,7 +107,7 @@ func EncodeSequences(list []uint64) []byte {
 // DecodeSequences will decode a list of compacted sequences.
 func DecodeSequences(value []byte) ([]uint64, error) {
 	// prepare list
-	list := make([]uint64, 0, bytes.Count(value, []byte(",")))
+	list := make([]uint64, 0, bytes.Count(value, []byte(","))+1)
 
 	// parse all items
 	for i := 0; i < len(value); {

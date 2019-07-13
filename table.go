@@ -2,8 +2,6 @@ package quasar
 
 import (
 	"sync"
-
-	"github.com/dgraph-io/badger"
 )
 
 // TableConfig is used to configure a table.
@@ -55,48 +53,34 @@ func CreateTable(db *DB, config TableConfig) (*Table, error) {
 func (t *Table) init() error {
 	// load existing positions if cache is available
 	if t.cache != nil {
-		err := t.db.View(func(txn *badger.Txn) error {
-			// prepare options
-			opts := badger.DefaultIteratorOptions
-			opts.Prefix = t.prefix
+		// iterate over all keys
+		iter := t.db.NewIterator(defaultReadOptions)
+		defer iter.Close()
 
-			// create iterator
-			iter := txn.NewIterator(badger.IteratorOptions{
-				Prefix:         t.prefix,
-				PrefetchValues: true,
-				PrefetchSize:   100,
-			})
-			defer iter.Close()
+		// compute start
+		start := t.makeKey("")
 
-			// compute start
-			start := t.makeKey("")
-
-			// iterate over all keys
-			for iter.Seek(start); iter.Valid(); iter.Next() {
-				// parse positions
-				var positions []uint64
-				var err error
-				err = iter.Item().Value(func(val []byte) error {
-					positions, err = DecodeSequences(val)
-					return err
-				})
-				if err != nil {
-					return err
-				}
-
-				// continue if empty
-				if len(positions) == 0 {
-					continue
-				}
-
-				// cache positions
-				t.cache.Store(string(iter.Item().Key()[len(t.prefix):]), positions)
+		// read all keys
+		for iter.Seek(start); iter.ValidForPrefix(t.prefix); iter.Next() {
+			// parse positions
+			positions, err := DecodeSequences(iter.Value().Data())
+			if err != nil {
+				return err
 			}
 
-			return nil
-		})
+			// continue if empty
+			if len(positions) == 0 {
+				continue
+			}
+
+			// cache positions
+			t.cache.Store(string(iter.Key().Data()[len(t.prefix):]), positions)
+		}
+
+		// check errors
+		err := iter.Err()
 		if err != nil {
-			return err
+			panic(err)
 		}
 	}
 
@@ -115,12 +99,7 @@ func (t *Table) Set(name string, positions []uint64) error {
 	}
 
 	// set entry
-	err := retryUpdate(t.db, func(txn *badger.Txn) error {
-		return txn.SetEntry(&badger.Entry{
-			Key:   t.makeKey(name),
-			Value: EncodeSequences(positions),
-		})
-	})
+	err := t.db.Put(defaultWriteOptions, t.makeKey(name), EncodeSequences(positions))
 	if err != nil {
 		return err
 	}
@@ -150,30 +129,14 @@ func (t *Table) Get(name string) ([]uint64, error) {
 		return value.([]uint64), nil
 	}
 
-	// prepare positions
-	var positions []uint64
-
 	// read positions
-	err := t.db.View(func(txn *badger.Txn) error {
-		// get item
-		item, err := txn.Get(t.makeKey(name))
-		if err == badger.ErrKeyNotFound {
-			return nil
-		} else if err != nil {
-			return err
-		}
+	item, err := t.db.Get(defaultReadOptions, t.makeKey(name))
+	if err != nil {
+		return nil, err
+	}
 
-		// parse key
-		err = item.Value(func(val []byte) error {
-			positions, err = DecodeSequences(val)
-			return err
-		})
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
+	// parse key
+	positions, err := DecodeSequences(item.Data())
 	if err != nil {
 		return nil, err
 	}
@@ -200,44 +163,29 @@ func (t *Table) All() (map[string][]uint64, error) {
 		return table, nil
 	}
 
-	// read positions from database
-	err := t.db.View(func(txn *badger.Txn) error {
-		// prepare options
-		opts := badger.DefaultIteratorOptions
-		opts.Prefix = t.prefix
+	// iterate over all keys
+	iter := t.db.NewIterator(defaultReadOptions)
+	defer iter.Close()
 
-		// create iterator
-		iter := txn.NewIterator(badger.IteratorOptions{
-			Prefix:         t.prefix,
-			PrefetchValues: true,
-			PrefetchSize:   100,
-		})
-		defer iter.Close()
+	// compute start
+	start := t.makeKey("")
 
-		// compute start
-		start := t.makeKey("")
-
-		// iterate over all keys
-		for iter.Seek(start); iter.Valid(); iter.Next() {
-			// parse positions
-			var positions []uint64
-			var err error
-			err = iter.Item().Value(func(val []byte) error {
-				positions, err = DecodeSequences(val)
-				return err
-			})
-			if err != nil {
-				return err
-			}
-
-			// set positions
-			table[string(iter.Item().Key()[len(t.prefix):])] = positions
+	// read all keys
+	for iter.Seek(start); iter.ValidForPrefix(t.prefix); iter.Next() {
+		// parse positions
+		positions, err := DecodeSequences(iter.Value().Data())
+		if err != nil {
+			return nil, err
 		}
 
-		return nil
-	})
+		// set positions
+		table[string(iter.Key().Data()[len(t.prefix):])] = positions
+	}
+
+	// check errors
+	err := iter.Err()
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	return table, nil
@@ -250,9 +198,7 @@ func (t *Table) Delete(name string) error {
 	defer t.mutex.RUnlock()
 
 	// delete item
-	err := retryUpdate(t.db, func(txn *badger.Txn) error {
-		return txn.Delete(t.makeKey(name))
-	})
+	err := t.db.Delete(defaultWriteOptions, t.makeKey(name))
 	if err != nil {
 		return err
 	}
@@ -309,84 +255,47 @@ func (t *Table) Range() (uint64, uint64, bool, error) {
 		return min, max, found, nil
 	}
 
-	// read positions range from database
-	err := t.db.View(func(txn *badger.Txn) error {
-		// prepare options
-		opts := badger.DefaultIteratorOptions
-		opts.Prefix = t.prefix
+	// iterate over all keys
+	iter := t.db.NewIterator(defaultReadOptions)
+	defer iter.Close()
 
-		// create iterator
-		iter := txn.NewIterator(badger.IteratorOptions{
-			Prefix:         t.prefix,
-			PrefetchValues: true,
-			PrefetchSize:   100,
-		})
-		defer iter.Close()
+	// compute start
+	start := t.makeKey("")
 
-		// compute start
-		start := t.makeKey("")
-
-		// iterate over all keys
-		for iter.Seek(start); iter.Valid(); iter.Next() {
-			// parse positions
-			var positions []uint64
-			var err error
-			err = iter.Item().Value(func(val []byte) error {
-				positions, err = DecodeSequences(val)
-				return err
-			})
-			if err != nil {
-				return err
-			}
-
-			// continue if empty
-			if len(positions) == 0 {
-				continue
-			}
-
-			// set min
-			if min == 0 || positions[0] < min {
-				min = positions[0]
-			}
-
-			// set max
-			if max == 0 || positions[len(positions)-1] > max {
-				max = positions[len(positions)-1]
-			}
-
-			// set flag
-			found = true
+	// read all keys
+	for iter.Seek(start); iter.ValidForPrefix(t.prefix); iter.Next() {
+		// parse positions
+		positions, err := DecodeSequences(iter.Value().Data())
+		if err != nil {
+			return 0, 0, false, err
 		}
 
-		return nil
-	})
+		// continue if empty
+		if len(positions) == 0 {
+			continue
+		}
+
+		// set min
+		if min == 0 || positions[0] < min {
+			min = positions[0]
+		}
+
+		// set max
+		if max == 0 || positions[len(positions)-1] > max {
+			max = positions[len(positions)-1]
+		}
+
+		// set flag
+		found = true
+	}
+
+	// check errors
+	err := iter.Err()
 	if err != nil {
-		return 0, 0, false, err
+		panic(err)
 	}
 
 	return min, max, found, nil
-}
-
-// Clear will drop all stored positions. Clear will temporarily block concurrent
-// writes and deletes and lock the underlying database. Other users uf the same
-// database may receive errors due to the locked database.
-func (t *Table) Clear() error {
-	// acquire mutex
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	// drop all entries
-	err := t.db.DropPrefix(t.prefix)
-	if err != nil {
-		return err
-	}
-
-	// reset cache if available
-	if t.cache != nil {
-		t.cache = new(sync.Map)
-	}
-
-	return nil
 }
 
 func (t *Table) makeKey(name string) []byte {

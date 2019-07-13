@@ -10,6 +10,7 @@ import (
 
 func TestConsumer(t *testing.T) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -93,13 +94,11 @@ func TestConsumer(t *testing.T) {
 	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{100}, sequences)
-
-	err = db.Close()
-	assert.NoError(t, err)
 }
 
 func TestConsumerWindow(t *testing.T) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -185,13 +184,11 @@ func TestConsumerWindow(t *testing.T) {
 	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{100}, sequences)
-
-	err = db.Close()
-	assert.NoError(t, err)
 }
 
 func TestConsumerCumulativeMarks(t *testing.T) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -246,13 +243,11 @@ func TestConsumerCumulativeMarks(t *testing.T) {
 	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{100}, sequences)
-
-	err = db.Close()
-	assert.NoError(t, err)
 }
 
 func TestConsumerMissedMark(t *testing.T) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -307,13 +302,11 @@ func TestConsumerMissedMark(t *testing.T) {
 	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{5}, sequences)
-
-	err = db.Close()
-	assert.NoError(t, err)
 }
 
 func TestConsumerTemporary(t *testing.T) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -380,13 +373,11 @@ func TestConsumerTemporary(t *testing.T) {
 	}
 
 	consumer.Close()
-
-	err = db.Close()
-	assert.NoError(t, err)
 }
 
 func TestConsumerUnorderedMarks(t *testing.T) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -455,13 +446,11 @@ func TestConsumerUnorderedMarks(t *testing.T) {
 	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{100}, sequences)
-
-	err = db.Close()
-	assert.NoError(t, err)
 }
 
 func TestConsumerSlowLedger(t *testing.T) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -519,13 +508,11 @@ func TestConsumerSlowLedger(t *testing.T) {
 	sequences, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{100}, sequences)
-
-	err = db.Close()
-	assert.NoError(t, err)
 }
 
 func TestConsumerSkipMark(t *testing.T) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -617,13 +604,11 @@ func TestConsumerSkipMark(t *testing.T) {
 	sequences, err = table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{4}, sequences)
-
-	err = db.Close()
-	assert.NoError(t, err)
 }
 
 func TestConsumerSkipMarkTimeout(t *testing.T) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -689,13 +674,11 @@ func TestConsumerSkipMarkTimeout(t *testing.T) {
 	assert.Equal(t, []uint64{2}, sequences)
 
 	consumer.Close()
-
-	err = db.Close()
-	assert.NoError(t, err)
 }
 
 func TestConsumerUnblock(t *testing.T) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -735,13 +718,11 @@ func TestConsumerUnblock(t *testing.T) {
 	assert.Equal(t, []byte("foo"), entry.Payload)
 
 	consumer.Close()
-
-	err = db.Close()
-	assert.NoError(t, err)
 }
 
 func TestConsumerResumeOutOfRange(t *testing.T) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -834,13 +815,11 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 	position, err = table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{90}, position)
-
-	err = db.Close()
-	assert.NoError(t, err)
 }
 
 func TestConsumerInvalidSequence(t *testing.T) {
 	db := openDB(true)
+	defer db.Close()
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -872,7 +851,4 @@ func TestConsumerInvalidSequence(t *testing.T) {
 	assert.True(t, ok)
 
 	consumer.Close()
-
-	err = db.Close()
-	assert.NoError(t, err)
 }
