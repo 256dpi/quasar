@@ -5,6 +5,8 @@ go:
 env:
   - GO111MODULE=on
 before_install:
+  - sudo apt-get update
+  - sudo apt-get install -y librocksdb-dev
   - go get github.com/mattn/goveralls
 install:
   - go get -t ./...
