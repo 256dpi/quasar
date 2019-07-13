@@ -52,9 +52,7 @@ type Ledger struct {
 	entryPrefix []byte
 	fieldPrefix []byte
 
-	receivers   sync.Map
-	writeMutex  sync.Mutex
-	deleteMutex sync.Mutex
+	receivers map[chan<- uint64]chan<- uint64
 
 	length int
 	head   uint64
@@ -83,6 +81,7 @@ func CreateLedger(db *DB, config LedgerConfig) (*Ledger, error) {
 		cache:       cache,
 		entryPrefix: append([]byte(config.Prefix), '#'),
 		fieldPrefix: append([]byte(config.Prefix), '!'),
+		receivers:   make(map[chan<- uint64]chan<- uint64),
 	}
 
 	// init ledger
@@ -174,14 +173,12 @@ func (l *Ledger) init() error {
 // is checked against the current head.
 func (l *Ledger) Write(entries ...Entry) error {
 	// acquire mutex
-	l.writeMutex.Lock()
-	defer l.writeMutex.Unlock()
-
-	// get head
 	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	// get head and length
 	head := l.head
 	length := l.length
-	l.mutex.Unlock()
 
 	// check length
 	if l.config.Limit > 0 && length+len(entries) > l.config.Limit {
@@ -218,10 +215,8 @@ func (l *Ledger) Write(entries ...Entry) error {
 	}
 
 	// set length and head
-	l.mutex.Lock()
 	l.length += len(entries)
 	l.head = head
-	l.mutex.Unlock()
 
 	// cache all entries
 	if l.cache != nil {
@@ -229,14 +224,12 @@ func (l *Ledger) Write(entries ...Entry) error {
 	}
 
 	// send notifications to all receivers and skip full receivers
-	l.receivers.Range(func(_, value interface{}) bool {
+	for receiver := range l.receivers {
 		select {
-		case value.(chan<- uint64) <- head:
+		case receiver <- head:
 		default:
 		}
-
-		return true
-	})
+	}
 
 	return nil
 }
@@ -244,6 +237,10 @@ func (l *Ledger) Write(entries ...Entry) error {
 // Read will read entries from and including the specified sequence up to the
 // requested amount of entries.
 func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
+	// acquire mutex
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
 	// prepare list
 	list := make([]Entry, 0, amount)
 
@@ -323,6 +320,10 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 // length, the sequence of the last entry and false is returned. If the ledger
 // is empty the current head (zero if unused) and false will be returned.
 func (l *Ledger) Index(index int) (uint64, bool, error) {
+	// acquire mutex
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
 	// compute direction
 	backward := index < 0
 
@@ -412,13 +413,11 @@ func (l *Ledger) Index(index int) (uint64, bool, error) {
 // from the ledger.
 func (l *Ledger) Delete(sequence uint64) (int, error) {
 	// acquire mutex
-	l.deleteMutex.Lock()
-	defer l.deleteMutex.Unlock()
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
 
 	// get head
-	l.mutex.Lock()
 	head := l.head
-	l.mutex.Unlock()
 
 	// never delete beyond the current head
 	if sequence > head {
@@ -445,9 +444,7 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 	}
 
 	// decrement length
-	l.mutex.Lock()
 	l.length -= n
-	l.mutex.Unlock()
 
 	// remove deleted entries from cache
 	if l.cache != nil {
@@ -545,35 +542,43 @@ func (l *Ledger) cachedDelete(sequence uint64) (int, error) {
 
 // Length will return the number of stored entries.
 func (l *Ledger) Length() int {
-	// get length
+	// acquire mutex
 	l.mutex.Lock()
-	length := l.length
-	l.mutex.Unlock()
+	defer l.mutex.Unlock()
 
-	return length
+	return l.length
 }
 
 // Head will return the last committed sequence. This value can be checked
 // periodically to asses whether new entries have been added.
 func (l *Ledger) Head() uint64 {
-	// get head
+	// acquire mutex
 	l.mutex.Lock()
-	head := l.head
-	l.mutex.Unlock()
+	defer l.mutex.Unlock()
 
-	return head
+	return l.head
 }
 
 // Subscribe will subscribe the specified channel to changes to the last
 // sequence stored in the ledger. Notifications will be skipped if the specified
 // channel is not writable for some reason.
 func (l *Ledger) Subscribe(receiver chan<- uint64) {
-	l.receivers.Store(receiver, receiver)
+	// acquire mutex
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	// store receiver
+	l.receivers[receiver] = receiver
 }
 
 // Unsubscribe will remove a previously subscribed receiver.
 func (l *Ledger) Unsubscribe(receiver chan<- uint64) {
-	l.receivers.Delete(receiver)
+	// acquire mutex
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	// delete receiver
+	delete(l.receivers, receiver)
 }
 
 func (l *Ledger) makeEntryKey(seq uint64) []byte {
