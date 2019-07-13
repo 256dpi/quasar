@@ -362,6 +362,46 @@ func TestLedgerHugeDelete(t *testing.T) {
 	}, dump(db))
 }
 
+func TestLedgerFastDelete(t *testing.T) {
+	N := 10000
+
+	db := openDB(true)
+	defer db.Close()
+
+	ledger, err := CreateLedger(db, LedgerConfig{
+		Prefix: "ledger",
+		Cache:  int(N + 10),
+		Limit:  int(N + 10),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, ledger)
+
+	batch := make([]Entry, 0, N+10)
+	for i := 1; i <= N+10; i++ {
+		batch = append(batch, Entry{
+			Sequence: uint64(i),
+			Payload:  []byte("foo"),
+		})
+	}
+
+	err = ledger.Write(batch[0 : N-10]...)
+	assert.NoError(t, err)
+
+	err = ledger.Write(batch[N-10 : N+10]...)
+	assert.NoError(t, err)
+
+	n, err := ledger.Delete(uint64(N + 10))
+	assert.NoError(t, err)
+	assert.Equal(t, int(N+10), n)
+
+	length := ledger.Length()
+	assert.Equal(t, 0, length)
+
+	assert.Equal(t, map[string]string{
+		"ledger!head": "10010",
+	}, dump(db))
+}
+
 func TestLedgerCache(t *testing.T) {
 	db := openDB(true)
 	defer db.Close()
@@ -534,51 +574,11 @@ func TestLedgerLimit(t *testing.T) {
 	assert.Equal(t, ErrLimitReached, err)
 }
 
-func TestLedgerFastDelete(t *testing.T) {
-	N := 10000
-
-	db := openDB(true)
-	defer db.Close()
-
-	ledger, err := CreateLedger(db, LedgerConfig{
-		Prefix: "ledger",
-		Cache:  int(N + 10),
-		Limit:  int(N + 10),
-	})
-	assert.NoError(t, err)
-	assert.NotNil(t, ledger)
-
-	batch := make([]Entry, 0, N+10)
-	for i := 1; i <= N+10; i++ {
-		batch = append(batch, Entry{
-			Sequence: uint64(i),
-			Payload:  []byte("foo"),
-		})
-	}
-
-	err = ledger.Write(batch[0 : N-10]...)
-	assert.NoError(t, err)
-
-	err = ledger.Write(batch[N-10 : N+10]...)
-	assert.NoError(t, err)
-
-	n, err := ledger.Delete(uint64(N + 10))
-	assert.NoError(t, err)
-	assert.Equal(t, int(N+10), n)
-
-	length := ledger.Length()
-	assert.Equal(t, 0, length)
-
-	assert.Equal(t, map[string]string{
-		"ledger!head": "10010",
-	}, dump(db))
-}
-
 func BenchmarkLedgerWrite(b *testing.B) {
 	db := openDB(true)
 	defer db.Close()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Cache: 1000})
 	if err != nil {
 		panic(err)
 	}
@@ -620,7 +620,7 @@ func BenchmarkLedgerRead(b *testing.B) {
 	db := openDB(true)
 	defer db.Close()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Cache: 1000})
 	if err != nil {
 		panic(err)
 	}
@@ -657,7 +657,7 @@ func BenchmarkLedgerDelete(b *testing.B) {
 	db := openDB(true)
 	defer db.Close()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Cache: 1000, Limit: 1000})
 	if err != nil {
 		panic(err)
 	}

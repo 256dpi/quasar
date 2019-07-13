@@ -196,7 +196,7 @@ func BenchmarkProducer(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for i := 0; i < b.N; i++ {
+	for i := 1; i <= b.N; i++ {
 		if i == b.N {
 			producer.Write(Entry{Sequence: uint64(i), Payload: []byte("foo")}, func(err error) {
 				if err != nil {
@@ -213,6 +213,8 @@ func BenchmarkProducer(b *testing.B) {
 			})
 		}
 	}
+
+	<-done
 
 	b.StopTimer()
 
