@@ -5,9 +5,18 @@ go:
 env:
   - GO111MODULE=on
 before_install:
-  - bash rocksdb.sh
   - go get github.com/mattn/goveralls
 install:
   - go get -t ./...
 script:
   - $HOME/gopath/bin/goveralls -service=travis-ci
+
+# for rocksdb
+distro: bionic
+addons:
+  apt:
+    packages:
+      - libsnappy-dev
+      - zlib1g-dev
+      - libbz2-dev
+      - librocksdb-dev
