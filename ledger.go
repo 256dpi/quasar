@@ -98,12 +98,8 @@ func (l *Ledger) init() error {
 	var length int
 	var head uint64
 
-	// prepare opts
-	opts := gorocksdb.NewDefaultReadOptions()
-	defer opts.Destroy()
-
 	// iterate over all keys
-	iter := l.db.NewIterator(opts)
+	iter := l.db.NewIterator(defaultReadOptions)
 	defer iter.Close()
 
 	// compute start
@@ -276,12 +272,8 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 		return list, nil
 	}
 
-	// prepare opts
-	opts := gorocksdb.NewDefaultReadOptions()
-	defer opts.Destroy()
-
 	// iterate over all keys
-	iter := l.db.NewIterator(opts)
+	iter := l.db.NewIterator(defaultReadOptions)
 	defer iter.Close()
 
 	// compute start
@@ -345,12 +337,8 @@ func (l *Ledger) Index(index int) (uint64, bool, error) {
 	var sequence uint64
 	var existing bool
 
-	// prepare opts
-	opts := gorocksdb.NewDefaultReadOptions()
-	defer opts.Destroy()
-
 	// iterate over all keys
-	iter := l.db.NewIterator(opts)
+	iter := l.db.NewIterator(defaultReadOptions)
 	defer iter.Close()
 
 	// compute start
@@ -457,12 +445,8 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 }
 
 func (l *Ledger) uncachedDelete(sequence uint64) (int, error) {
-	// prepare opts
-	opts := gorocksdb.NewDefaultReadOptions()
-	defer opts.Destroy()
-
 	// iterate over all keys
-	iter := l.db.NewIterator(opts)
+	iter := l.db.NewIterator(defaultReadOptions)
 	defer iter.Close()
 
 	// compute start

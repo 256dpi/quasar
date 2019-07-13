@@ -3,8 +3,6 @@ package quasar
 import (
 	"os"
 	"path/filepath"
-
-	"github.com/tecbot/gorocksdb"
 )
 
 func openDB(clear bool) *DB {
@@ -32,12 +30,8 @@ func openDB(clear bool) *DB {
 }
 
 func set(db *DB, key, value string) {
-	// prepare opts
-	opts := gorocksdb.NewDefaultWriteOptions()
-	defer opts.Destroy()
-
 	// set entry
-	err := db.Put(opts, []byte(key), []byte(value))
+	err := db.Put(defaultWriteOptions, []byte(key), []byte(value))
 	if err != nil {
 		panic(err)
 	}
@@ -47,12 +41,8 @@ func dump(db *DB) map[string]string {
 	// prepare map
 	data := map[string]string{}
 
-	// prepare opts
-	opts := gorocksdb.NewDefaultReadOptions()
-	defer opts.Destroy()
-
 	// iterate over all keys
-	iter := db.NewIterator(opts)
+	iter := db.NewIterator(defaultReadOptions)
 	defer iter.Close()
 
 	// read all keys
