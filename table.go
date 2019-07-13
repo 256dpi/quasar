@@ -53,7 +53,7 @@ func CreateTable(db *DB, config TableConfig) (*Table, error) {
 func (t *Table) init() error {
 	// load existing positions if cache is available
 	if t.cache != nil {
-		// iterate over all keys
+		// create iterator
 		iter := t.db.NewIterator(defaultReadOptions)
 		defer iter.Close()
 
@@ -80,7 +80,7 @@ func (t *Table) init() error {
 		// check errors
 		err := iter.Err()
 		if err != nil {
-			panic(err)
+			return err
 		}
 	}
 
@@ -161,7 +161,7 @@ func (t *Table) All() (map[string][]uint64, error) {
 		return table, nil
 	}
 
-	// iterate over all keys
+	// create iterator
 	iter := t.db.NewIterator(defaultReadOptions)
 	defer iter.Close()
 
@@ -183,7 +183,7 @@ func (t *Table) All() (map[string][]uint64, error) {
 	// check errors
 	err := iter.Err()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	return table, nil
@@ -248,7 +248,7 @@ func (t *Table) Range() (uint64, uint64, bool, error) {
 		return min, max, found, nil
 	}
 
-	// iterate over all keys
+	// create iterator
 	iter := t.db.NewIterator(defaultReadOptions)
 	defer iter.Close()
 
@@ -285,7 +285,7 @@ func (t *Table) Range() (uint64, uint64, bool, error) {
 	// check errors
 	err := iter.Err()
 	if err != nil {
-		panic(err)
+		return 0, 0, false, err
 	}
 
 	return min, max, found, nil

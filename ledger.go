@@ -98,23 +98,26 @@ func (l *Ledger) init() error {
 	var length int
 	var head uint64
 
-	// iterate over all keys
+	// create iterator
 	iter := l.db.NewIterator(defaultReadOptions)
 	defer iter.Close()
 
 	// compute start
 	start := l.makeEntryKey(0)
 
-	// read all keys
+	// read all entries
 	for iter.Seek(start); iter.ValidForPrefix(l.entryPrefix); iter.Next() {
 		// increment length
 		length++
 
-		// parse key and set head
+		// parse key
 		seq, err := DecodeSequence(iter.Key().Data()[len(l.entryPrefix):])
 		if err != nil {
 			return err
 		}
+
+		// set head
+		head = seq
 
 		// cache entry
 		if l.cache != nil {
@@ -128,15 +131,12 @@ func (l *Ledger) init() error {
 				Payload:  value,
 			})
 		}
-
-		// set head
-		head = seq
 	}
 
 	// check errors
 	err := iter.Err()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	// read stored head if collapsed
@@ -272,7 +272,7 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 		return list, nil
 	}
 
-	// iterate over all keys
+	// create iterator
 	iter := l.db.NewIterator(defaultReadOptions)
 	defer iter.Close()
 
@@ -301,7 +301,7 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 	// check errors
 	err := iter.Err()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	return list, nil
@@ -337,7 +337,7 @@ func (l *Ledger) Index(index int) (uint64, bool, error) {
 	var sequence uint64
 	var existing bool
 
-	// iterate over all keys
+	// create iterator
 	iter := l.db.NewIterator(defaultReadOptions)
 	defer iter.Close()
 
@@ -364,21 +364,23 @@ func (l *Ledger) Index(index int) (uint64, bool, error) {
 
 	// read all keys
 	for seek(); iter.ValidForPrefix(l.entryPrefix); next() {
-		// otherwise parse key
-		seq, err := DecodeSequence(iter.Key().Data()[len(l.entryPrefix):])
-		if err != nil {
-			return 0, false, err
-		}
-
-		// set sequence
-		sequence = seq
-
-		// increment length
+		// increment counter
 		counter++
 
 		// check counter
 		if counter >= (index + 1) {
+			// parse key
+			seq, err := DecodeSequence(iter.Key().Data()[len(l.entryPrefix):])
+			if err != nil {
+				return 0, false, err
+			}
+
+			// set sequence
+			sequence = seq
+
+			// set flag
 			existing = true
+
 			break
 		}
 	}
@@ -404,12 +406,9 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
-	// get head
-	head := l.head
-
 	// never delete beyond the current head
-	if sequence > head {
-		sequence = head
+	if sequence > l.head {
+		sequence = l.head
 	}
 
 	// we can do a fast delete if the ledger is fully cached
@@ -445,7 +444,7 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 }
 
 func (l *Ledger) uncachedDelete(sequence uint64) (int, error) {
-	// iterate over all keys
+	// create iterator
 	iter := l.db.NewIterator(defaultReadOptions)
 	defer iter.Close()
 

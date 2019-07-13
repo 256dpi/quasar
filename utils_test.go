@@ -41,7 +41,7 @@ func dump(db *DB) map[string]string {
 	// prepare map
 	data := map[string]string{}
 
-	// iterate over all keys
+	// create iterator
 	iter := db.NewIterator(defaultReadOptions)
 	defer iter.Close()
 
