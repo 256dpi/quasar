@@ -162,7 +162,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close()
+	defer closeDB(db)
 
 	// create queue
 	queue, err := quasar.CreateQueue(db, quasar.QueueConfig{

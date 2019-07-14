@@ -31,6 +31,13 @@ func openDB(clear bool) *DB {
 	return db
 }
 
+func closeDB(db *DB) {
+	err := db.Close()
+	if err != nil {
+		panic(err)
+	}
+}
+
 func set(db *DB, key, value string) {
 	// set entry
 	err := db.Set([]byte(key), []byte(value), defaultWriteOptions)

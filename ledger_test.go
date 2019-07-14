@@ -10,7 +10,7 @@ import (
 
 func TestLedger(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	// open
 
@@ -125,7 +125,7 @@ func TestLedger(t *testing.T) {
 
 func TestLedgerDeleteOutOfRange(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -149,7 +149,7 @@ func TestLedgerDeleteOutOfRange(t *testing.T) {
 
 func TestLedgerIndex(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -215,7 +215,7 @@ func TestLedgerIndex(t *testing.T) {
 
 func TestLedgerIsolation(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	set(db, "00000000000000000001", "a")
 	set(db, "e:00000000000000000002", "b")
@@ -243,7 +243,7 @@ func TestLedgerIsolation(t *testing.T) {
 
 func TestLedgerMonotonicity(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -275,7 +275,7 @@ func TestLedgerReopen(t *testing.T) {
 	err = ledger.Write(Entry{Sequence: 1, Payload: []byte("foo")})
 	assert.NoError(t, err)
 
-	db.Close()
+	closeDB(db)
 	db = openDB(false)
 
 	ledger, err = CreateLedger(db, LedgerConfig{Prefix: "ledger"})
@@ -294,7 +294,7 @@ func TestLedgerReopen(t *testing.T) {
 	head := ledger.Head()
 	assert.Equal(t, uint64(1), head)
 
-	db.Close()
+	closeDB(db)
 }
 
 func TestLedgerReopenCollapsed(t *testing.T) {
@@ -310,7 +310,7 @@ func TestLedgerReopenCollapsed(t *testing.T) {
 	_, err = ledger.Delete(1)
 	assert.NoError(t, err)
 
-	db.Close()
+	closeDB(db)
 	db = openDB(false)
 
 	ledger, err = CreateLedger(db, LedgerConfig{Prefix: "ledger"})
@@ -323,14 +323,14 @@ func TestLedgerReopenCollapsed(t *testing.T) {
 	head := ledger.Head()
 	assert.Equal(t, uint64(1), head)
 
-	db.Close()
+	closeDB(db)
 }
 
 func TestLedgerHugeDelete(t *testing.T) {
 	N := 10000
 
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -366,7 +366,7 @@ func TestLedgerFastDelete(t *testing.T) {
 	N := 10000
 
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{
 		Prefix: "ledger",
@@ -404,7 +404,7 @@ func TestLedgerFastDelete(t *testing.T) {
 
 func TestLedgerCache(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Cache: 3})
 	assert.NoError(t, err)
@@ -471,7 +471,7 @@ func TestLedgerCache(t *testing.T) {
 
 func TestLedgerIndexCache(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Cache: 100})
 	assert.NoError(t, err)
@@ -537,7 +537,7 @@ func TestLedgerIndexCache(t *testing.T) {
 
 func TestLedgerLimit(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Limit: 3})
 	assert.NoError(t, err)
@@ -576,7 +576,7 @@ func TestLedgerLimit(t *testing.T) {
 
 func BenchmarkLedgerWrite(b *testing.B) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Cache: 1000})
 	if err != nil {
@@ -618,7 +618,7 @@ func BenchmarkLedgerWrite(b *testing.B) {
 
 func BenchmarkLedgerRead(b *testing.B) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Cache: 1000})
 	if err != nil {
@@ -655,7 +655,7 @@ func BenchmarkLedgerRead(b *testing.B) {
 
 func BenchmarkLedgerDelete(b *testing.B) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Cache: 1000, Limit: 1000})
 	if err != nil {

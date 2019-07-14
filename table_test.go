@@ -9,7 +9,7 @@ import (
 
 func TestTable(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	// open
 
@@ -73,7 +73,7 @@ func TestTable(t *testing.T) {
 
 func TestTableCache(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	// open
 
@@ -137,7 +137,7 @@ func TestTableCache(t *testing.T) {
 
 func TestTableRange(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
@@ -180,7 +180,7 @@ func TestTableRange(t *testing.T) {
 
 func TestTableRangeCache(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	table, err := CreateTable(db, TableConfig{Prefix: "table", Cache: true})
 	assert.NoError(t, err)
@@ -223,7 +223,7 @@ func TestTableRangeCache(t *testing.T) {
 
 func TestTableIsolation(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	set(db, "foo", "1")
 	set(db, "table!foo", "2")
@@ -254,7 +254,7 @@ func TestTableReopen(t *testing.T) {
 	err = table.Set("foo", []uint64{1})
 	assert.NoError(t, err)
 
-	db.Close()
+	closeDB(db)
 	db = openDB(false)
 
 	table, err = CreateTable(db, TableConfig{Prefix: "table"})
@@ -265,12 +265,12 @@ func TestTableReopen(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{1}, position)
 
-	db.Close()
+	closeDB(db)
 }
 
 func BenchmarkTableSet(b *testing.B) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	if err != nil {
@@ -294,7 +294,7 @@ func BenchmarkTableSet(b *testing.B) {
 
 func BenchmarkTableGet(b *testing.B) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	if err != nil {
@@ -323,7 +323,7 @@ func BenchmarkTableGet(b *testing.B) {
 
 func BenchmarkTableDelete(b *testing.B) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	table, err := CreateTable(db, TableConfig{Prefix: "table"})
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 
 func TestConsumer(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -98,7 +98,7 @@ func TestConsumer(t *testing.T) {
 
 func TestConsumerWindow(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -188,7 +188,7 @@ func TestConsumerWindow(t *testing.T) {
 
 func TestConsumerCumulativeMarks(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -247,7 +247,7 @@ func TestConsumerCumulativeMarks(t *testing.T) {
 
 func TestConsumerMissedMark(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -306,7 +306,7 @@ func TestConsumerMissedMark(t *testing.T) {
 
 func TestConsumerTemporary(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -377,7 +377,7 @@ func TestConsumerTemporary(t *testing.T) {
 
 func TestConsumerUnorderedMarks(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -450,7 +450,7 @@ func TestConsumerUnorderedMarks(t *testing.T) {
 
 func TestConsumerSlowLedger(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -512,7 +512,7 @@ func TestConsumerSlowLedger(t *testing.T) {
 
 func TestConsumerSkipMark(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -608,7 +608,7 @@ func TestConsumerSkipMark(t *testing.T) {
 
 func TestConsumerSkipMarkTimeout(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -678,7 +678,7 @@ func TestConsumerSkipMarkTimeout(t *testing.T) {
 
 func TestConsumerUnblock(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -722,7 +722,7 @@ func TestConsumerUnblock(t *testing.T) {
 
 func TestConsumerResumeOutOfRange(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -819,7 +819,7 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 
 func TestConsumerInvalidSequence(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)

@@ -9,7 +9,7 @@ import (
 
 func TestProducer(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -46,7 +46,7 @@ func TestProducer(t *testing.T) {
 
 func TestProducerFilter(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -103,7 +103,7 @@ func TestProducerFilter(t *testing.T) {
 
 func TestProducerCancel(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
@@ -128,7 +128,7 @@ func TestProducerCancel(t *testing.T) {
 
 func TestProducerRetry(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Limit: 10})
 	assert.NoError(t, err)
@@ -179,7 +179,7 @@ func TestProducerRetry(t *testing.T) {
 
 func BenchmarkProducer(b *testing.B) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
 	if err != nil {

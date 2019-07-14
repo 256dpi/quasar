@@ -9,7 +9,7 @@ import (
 
 func TestQueue(t *testing.T) {
 	db := openDB(true)
-	defer db.Close()
+	defer closeDB(db)
 
 	queue, err := CreateQueue(db, QueueConfig{
 		Prefix:         "queue",
