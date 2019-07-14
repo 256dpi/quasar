@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestOpenDB(t *testing.T) {
@@ -18,12 +20,13 @@ func TestOpenDB(t *testing.T) {
 		panic(err)
 	}
 
-	db, err := OpenDB(dir)
+	db, err := OpenDB(dir, nil)
 	if err != nil {
 		panic(err)
 	}
 
 	time.Sleep(5 * time.Millisecond)
 
-	db.Close()
+	err = db.Close()
+	assert.NoError(t, err)
 }

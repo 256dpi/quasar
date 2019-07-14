@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -157,7 +158,7 @@ func main() {
 	}
 
 	// open db
-	db, err := quasar.OpenDB(dir)
+	db, err := quasar.OpenDB(dir, log.Printf)
 	if err != nil {
 		panic(err)
 	}

@@ -14,7 +14,7 @@ type DB = pebble.DB
 
 // OpenDB will open or create the specified db. A function is returned that must
 // be called before closing the returned db to close the GC routine.
-func OpenDB(directory string) (*DB, error) {
+func OpenDB(directory string, log func(fmt string, args ...interface{})) (*DB, error) {
 	// check directory
 	if directory == "" {
 		panic("quasar: missing directory")
@@ -38,11 +38,28 @@ func OpenDB(directory string) (*DB, error) {
 		Levels: []pebble.LevelOptions{{
 			BlockSize: 32 << 10, // 32KB
 		}},
-		EventListener: pebble.MakeLoggingEventListener(nil),
+		Logger:        &logger{log},
+		EventListener: pebble.MakeLoggingEventListener(&logger{log}),
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	return db, nil
+}
+
+type logger struct {
+	fn func(string, ...interface{})
+}
+
+func (l *logger) Infof(format string, args ...interface{}) {
+	if l.fn != nil {
+		l.fn(format, args...)
+	}
+}
+
+func (l *logger) Fatalf(format string, args ...interface{}) {
+	if l.fn != nil {
+		l.fn(format, args...)
+	}
 }

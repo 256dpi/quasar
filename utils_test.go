@@ -23,7 +23,7 @@ func openDB(clear bool) *DB {
 	}
 
 	// open db
-	db, err := OpenDB(dir)
+	db, err := OpenDB(dir, nil)
 	if err != nil {
 		panic(err)
 	}
