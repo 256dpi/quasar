@@ -23,7 +23,7 @@ func openDB(clear bool) *DB {
 	}
 
 	// open db
-	db, err := OpenDB(dir, nil)
+	db, err := OpenDB(dir, DBConfig{})
 	if err != nil {
 		panic(err)
 	}
@@ -40,7 +40,7 @@ func closeDB(db *DB) {
 
 func set(db *DB, key, value string) {
 	// set entry
-	err := db.Set([]byte(key), []byte(value), defaultWriteOptions)
+	err := db.Set([]byte(key), []byte(value), pebble.Sync)
 	if err != nil {
 		panic(err)
 	}

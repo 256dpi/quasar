@@ -101,7 +101,7 @@ func (t *Table) Set(name string, positions []uint64) error {
 	}
 
 	// set entry
-	err := t.db.Set(t.makeKey(name), EncodeSequences(positions), defaultWriteOptions)
+	err := t.db.Set(t.makeKey(name), EncodeSequences(positions), t.db.wo)
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func (t *Table) Delete(name string) error {
 	defer t.mutex.Unlock()
 
 	// delete item
-	err := t.db.Delete(t.makeKey(name), defaultWriteOptions)
+	err := t.db.Delete(t.makeKey(name), t.db.wo)
 	if err != nil {
 		return err
 	}

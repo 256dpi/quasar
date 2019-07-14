@@ -158,11 +158,13 @@ func main() {
 	}
 
 	// open db
-	db, err := quasar.OpenDB(dir, log.Printf)
+	db, err := quasar.OpenDB(dir, quasar.DBConfig{
+		SyncWrites: false,
+		Logger:     log.Printf,
+	})
 	if err != nil {
 		panic(err)
 	}
-	defer closeDB(db)
 
 	// create queue
 	queue, err := quasar.CreateQueue(db, quasar.QueueConfig{

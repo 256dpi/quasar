@@ -197,20 +197,20 @@ func (l *Ledger) Write(entries ...Entry) error {
 
 	// add all entries
 	for _, entry := range entries {
-		err := batch.Set(l.makeEntryKey(entry.Sequence), entry.Payload, defaultWriteOptions)
+		err := batch.Set(l.makeEntryKey(entry.Sequence), entry.Payload, l.db.wo)
 		if err != nil {
 			return err
 		}
 	}
 
 	// add head
-	err := batch.Set(l.makeFieldKey("head"), []byte(strconv.FormatUint(head, 10)), defaultWriteOptions)
+	err := batch.Set(l.makeFieldKey("head"), []byte(strconv.FormatUint(head, 10)), l.db.wo)
 	if err != nil {
 		return err
 	}
 
 	// perform write
-	err = batch.Commit(defaultWriteOptions)
+	err = batch.Commit(l.db.wo)
 	if err != nil {
 		return err
 	}
@@ -469,13 +469,13 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 	batch := l.db.NewBatch()
 
 	// delete entries
-	err := batch.DeleteRange(l.makeEntryKey(0), l.makeEntryKey(sequence+1), defaultWriteOptions)
+	err := batch.DeleteRange(l.makeEntryKey(0), l.makeEntryKey(sequence+1), l.db.wo)
 	if err != nil {
 		return 0, err
 	}
 
 	// write batch
-	err = batch.Commit(defaultWriteOptions)
+	err = batch.Commit(l.db.wo)
 	if err != nil {
 		return 0, err
 	}

@@ -20,7 +20,7 @@ func TestOpenDB(t *testing.T) {
 		panic(err)
 	}
 
-	db, err := OpenDB(dir, nil)
+	db, err := OpenDB(dir, DBConfig{})
 	if err != nil {
 		panic(err)
 	}
