@@ -56,6 +56,7 @@ type Ledger struct {
 
 	length int
 	head   uint64
+	tail   uint64
 	mutex  sync.Mutex
 }
 
@@ -97,6 +98,7 @@ func (l *Ledger) init() error {
 	// prepare length and head
 	var length int
 	var head uint64
+	var tail uint64
 
 	// create iterator
 	iter := l.db.NewIter(prefixIterator(l.entryPrefix))
@@ -118,6 +120,11 @@ func (l *Ledger) init() error {
 
 		// set head
 		head = seq
+
+		// set tail
+		if tail == 0 {
+			tail = seq
+		}
 
 		// cache entry
 		if l.cache != nil {
@@ -147,9 +154,8 @@ func (l *Ledger) init() error {
 			return err
 		}
 
-		// parse if present
+		// parse head if present
 		if value != nil {
-			// parse length
 			head, err = DecodeSequence(value)
 			if err != nil {
 				return err
@@ -157,9 +163,15 @@ func (l *Ledger) init() error {
 		}
 	}
 
+	// set tail to head if collapsed
+	if tail == 0 {
+		tail = head
+	}
+
 	// set length and head
 	l.length = length
 	l.head = head
+	l.tail = tail
 
 	return nil
 }
@@ -485,6 +497,9 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 	// decrement length
 	l.length -= counter
 
+	// set tail
+	l.tail = sequence
+
 	// remove deleted entries from cache
 	if l.cache != nil {
 		l.cache.Trim(func(entry Entry) bool {
@@ -512,6 +527,16 @@ func (l *Ledger) Head() uint64 {
 	defer l.mutex.Unlock()
 
 	return l.head
+}
+
+// Tail will return the last deleted sequence. This value can be checked
+// periodically to asses whether entries haven been deleted.
+func (l *Ledger) Tail() uint64 {
+	// acquire mutex
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	return l.tail
 }
 
 // Subscribe will subscribe the specified channel to changes to the last

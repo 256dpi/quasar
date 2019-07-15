@@ -27,6 +27,9 @@ func TestLedger(t *testing.T) {
 	head := ledger.Head()
 	assert.Equal(t, uint64(0), head)
 
+	tail := ledger.Tail()
+	assert.Equal(t, uint64(0), tail)
+
 	assert.Equal(t, map[string]string{}, dump(db))
 
 	// write single
@@ -48,6 +51,9 @@ func TestLedger(t *testing.T) {
 
 	head = ledger.Head()
 	assert.Equal(t, uint64(1), head)
+
+	tail = ledger.Tail()
+	assert.Equal(t, uint64(0), tail)
 
 	assert.Equal(t, map[string]string{
 		"ledger!head":                 "1",
@@ -80,6 +86,9 @@ func TestLedger(t *testing.T) {
 
 	head = ledger.Head()
 	assert.Equal(t, uint64(4), head)
+
+	tail = ledger.Tail()
+	assert.Equal(t, uint64(0), tail)
 
 	assert.Equal(t, map[string]string{
 		"ledger!head":                 "4",
@@ -117,6 +126,9 @@ func TestLedger(t *testing.T) {
 	head = ledger.Head()
 	assert.Equal(t, uint64(4), head)
 
+	tail = ledger.Tail()
+	assert.Equal(t, uint64(3), tail)
+
 	assert.Equal(t, map[string]string{
 		"ledger!head":                 "4",
 		"ledger#00000000000000000004": "qux",
@@ -145,6 +157,9 @@ func TestLedgerDeleteOutOfRange(t *testing.T) {
 
 	length := ledger.Length()
 	assert.Equal(t, 4, length)
+
+	tail := ledger.Tail()
+	assert.Equal(t, uint64(1), tail)
 }
 
 func TestLedgerIndex(t *testing.T) {
