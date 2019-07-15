@@ -41,13 +41,13 @@ func OpenDB(directory string, config DBConfig) (*DB, error) {
 
 	// open db
 	pdb, err := pebble.Open(directory, &pebble.Options{
-		Cache:                       cache.New(128 << 20), // 128MB
-		MemTableSize:                64 << 20,             // 64MB
+		Cache:                       cache.New(64 << 20),
+		MemTableSize:                16 << 20,
 		MemTableStopWritesThreshold: 4,
-		MinFlushRate:                4 << 20, // 4MB
+		MinFlushRate:                4 << 20,
 		L0CompactionThreshold:       2,
-		L0StopWritesThreshold:       32,
-		LBaseMaxBytes:               64 << 20, // 64MB
+		L0StopWritesThreshold:       16,
+		LBaseMaxBytes:               16 << 20,
 		Levels: []pebble.LevelOptions{{
 			BlockSize: 32 << 10, // 32KB
 		}},

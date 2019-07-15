@@ -194,6 +194,7 @@ func (l *Ledger) Write(entries ...Entry) error {
 
 	// prepare batch
 	batch := l.db.NewBatch()
+	defer batch.Close()
 
 	// add all entries
 	for _, entry := range entries {
@@ -467,6 +468,7 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 
 	// prepare batch
 	batch := l.db.NewBatch()
+	defer batch.Close()
 
 	// delete entries
 	err := batch.DeleteRange(l.makeEntryKey(0), l.makeEntryKey(sequence+1), l.db.wo)
