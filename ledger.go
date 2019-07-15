@@ -429,6 +429,11 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 		sequence = l.head
 	}
 
+	// skip if ledger is empty or sequence is at or behind tail
+	if l.length == 0 || sequence <= l.tail {
+		return 0, nil
+	}
+
 	// prepare counter
 	var counter int
 
