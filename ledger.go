@@ -483,7 +483,7 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 	defer batch.Close()
 
 	// delete entries
-	err := batch.DeleteRange(l.makeEntryKey(0), l.makeEntryKey(sequence+1), l.db.wo)
+	err := batch.DeleteRange(l.makeEntryKey(l.tail+1), l.makeEntryKey(sequence+1), l.db.wo)
 	if err != nil {
 		return 0, err
 	}

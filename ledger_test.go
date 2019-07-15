@@ -108,11 +108,41 @@ func TestLedger(t *testing.T) {
 		{Sequence: 4, Payload: []byte("qux")},
 	}, entries)
 
-	// delete
+	// delete one
 
-	n, err := ledger.Delete(3)
+	n, err := ledger.Delete(1)
 	assert.NoError(t, err)
-	assert.Equal(t, 3, n)
+	assert.Equal(t, 1, n)
+
+	entries, err = ledger.Read(0, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, []Entry{
+		{Sequence: 2, Payload: []byte("bar")},
+		{Sequence: 3, Payload: []byte("baz")},
+		{Sequence: 4, Payload: []byte("qux")},
+	}, entries)
+
+	length = ledger.Length()
+	assert.Equal(t, 3, length)
+
+	head = ledger.Head()
+	assert.Equal(t, uint64(4), head)
+
+	tail = ledger.Tail()
+	assert.Equal(t, uint64(1), tail)
+
+	assert.Equal(t, map[string]string{
+		"ledger!head":                 "4",
+		"ledger#00000000000000000002": "bar",
+		"ledger#00000000000000000003": "baz",
+		"ledger#00000000000000000004": "qux",
+	}, dump(db))
+
+	// delete multiple
+
+	n, err = ledger.Delete(3)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, n)
 
 	entries, err = ledger.Read(0, 10)
 	assert.NoError(t, err)
