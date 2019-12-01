@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/petermattis/pebble"
+	"github.com/cockroachdb/pebble"
 )
 
 func openDB(clear bool) *DB {

@@ -3,7 +3,7 @@ package quasar
 import (
 	"sync"
 
-	"github.com/petermattis/pebble"
+	"github.com/cockroachdb/pebble"
 )
 
 // TableConfig is used to configure a table.

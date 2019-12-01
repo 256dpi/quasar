@@ -3,8 +3,7 @@ package quasar
 import (
 	"os"
 
-	"github.com/petermattis/pebble"
-	"github.com/petermattis/pebble/cache"
+	"github.com/cockroachdb/pebble"
 )
 
 // DBConfig is used to configure a DB.
@@ -41,7 +40,7 @@ func OpenDB(directory string, config DBConfig) (*DB, error) {
 
 	// open db
 	pdb, err := pebble.Open(directory, &pebble.Options{
-		Cache:                       cache.New(64 << 20),
+		Cache:                       pebble.NewCache(64 << 20),
 		MemTableSize:                16 << 20,
 		MemTableStopWritesThreshold: 4,
 		MinFlushRate:                4 << 20,

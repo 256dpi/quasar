@@ -1,6 +1,6 @@
 package quasar
 
-import "github.com/petermattis/pebble"
+import "github.com/cockroachdb/pebble"
 
 func prefixRange(prefix []byte) ([]byte, []byte) {
 	var limit []byte

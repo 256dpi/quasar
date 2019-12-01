@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/petermattis/pebble"
+	"github.com/cockroachdb/pebble"
 )
 
 // ErrNotMonotonic is returned for write attempts that are not monotonic.
