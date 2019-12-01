@@ -1,7 +1,6 @@
 package quasar
 
 import (
-	"bytes"
 	"math"
 	"testing"
 	"time"
@@ -68,14 +67,6 @@ func TestEncodeAndDecodeSequence(t *testing.T) {
 	n, err = DecodeSequence(key)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(math.MaxUint64), n)
-}
-
-func TestEncodeSequenceTo(t *testing.T) {
-	buf := bytes.NewBuffer(nil)
-
-	err := EncodeSequenceTo(buf, 1, false)
-	assert.NoError(t, err)
-	assert.Equal(t, "00000000000000000001", buf.String())
 }
 
 func TestEncodeDecodeSequences(t *testing.T) {
@@ -173,6 +164,14 @@ func BenchmarkEncodeSequence(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		EncodeSequence(uint64(i), false)
+	}
+}
+
+func BenchmarkEncodeSequenceCompact(b *testing.B) {
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		EncodeSequence(uint64(i), true)
 	}
 }
 

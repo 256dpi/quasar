@@ -2,8 +2,6 @@ package quasar
 
 import (
 	"bytes"
-	"fmt"
-	"io"
 	"sort"
 	"strconv"
 	"sync"
@@ -60,29 +58,34 @@ func SplitSequence(s uint64) (time.Time, uint32) {
 
 // EncodeSequence will encode a sequence.
 func EncodeSequence(s uint64, compact bool) []byte {
-	// check compact
-	if compact {
-		return []byte(fmt.Sprintf("%d", s))
+	// prepare buffer
+	buf := make([]byte, EncodedSequenceLength*2)
+
+	// encode number
+	res := strconv.AppendUint(buf[EncodedSequenceLength:EncodedSequenceLength], s, 10)
+
+	// return directly if compact or full
+	if compact || len(res) >= EncodedSequenceLength {
+		return res
 	}
 
-	return []byte(fmt.Sprintf("%020d", s))
-}
+	// determine start
+	start := len(res)
 
-// EncodeSequenceTo will encode a sequence to the specified writer.
-func EncodeSequenceTo(w io.Writer, s uint64, compact bool) error {
-	// check compact
-	if compact {
-		_, err := fmt.Fprintf(w, "%d", s)
-		return err
+	// writes zeroes
+	for i := start; i < start+EncodedSequenceLength-len(res); i++ {
+		buf[i] = '0'
 	}
 
-	_, err := fmt.Fprintf(w, "%020d", s)
-	return err
+	// slice number
+	res = buf[start : start+EncodedSequenceLength]
+
+	return res
 }
 
 // DecodeSequence will decode a sequence.
 func DecodeSequence(key []byte) (uint64, error) {
-	return strconv.ParseUint(string(key), 10, 64)
+	return strconv.ParseUint(toString(key), 10, 64)
 }
 
 // EncodeSequences will encode a list of compacted sequences.
@@ -118,7 +121,7 @@ func DecodeSequences(value []byte) ([]uint64, error) {
 		}
 
 		// parse item
-		item, err := strconv.ParseUint(string(value[i:i+index]), 10, 64)
+		item, err := strconv.ParseUint(toString(value[i:i+index]), 10, 64)
 		if err != nil {
 			return nil, err
 		}

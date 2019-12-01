@@ -1,6 +1,10 @@
 package quasar
 
-import "github.com/cockroachdb/pebble"
+import (
+	"unsafe"
+
+	"github.com/cockroachdb/pebble"
+)
 
 func prefixRange(prefix []byte) ([]byte, []byte) {
 	var limit []byte
@@ -23,4 +27,9 @@ func prefixIterator(prefix []byte) *pebble.IterOptions {
 		LowerBound: low,
 		UpperBound: up,
 	}
+}
+
+func toString(b []byte) string {
+	// this is not safe, but unlikely to break
+	return *(*string)(unsafe.Pointer(&b))
 }
