@@ -149,9 +149,14 @@ func (l *Ledger) init() error {
 	// read stored head if collapsed
 	if length <= 0 {
 		// read stored head
-		value, err := l.db.Get(l.makeFieldKey("head"))
+		value, closer, err := l.db.Get(l.makeFieldKey("head"))
 		if err != nil && err != pebble.ErrNotFound {
 			return err
+		}
+
+		// ensure close
+		if err == nil {
+			defer closer.Close()
 		}
 
 		// parse head if present

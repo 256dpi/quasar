@@ -131,12 +131,15 @@ func (t *Table) Get(name string) ([]uint64, error) {
 	}
 
 	// read positions
-	value, err := t.db.Get(t.makeKey(name))
+	value, closer, err := t.db.Get(t.makeKey(name))
 	if err == pebble.ErrNotFound {
 		return []uint64{}, nil
 	} else if err != nil {
 		return nil, err
 	}
+
+	// ensure close
+	defer closer.Close()
 
 	// parse key
 	positions, err := DecodeSequences(value)
