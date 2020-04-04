@@ -18,7 +18,17 @@ type DBConfig struct {
 // DB is a generic database.
 type DB struct {
 	*pebble.DB
+	ch *pebble.Cache
 	wo *pebble.WriteOptions
+}
+
+// Close will close the db.
+func (db *DB) Close() error {
+	// unref cache
+	db.ch.Unref()
+
+	// close db
+	return db.DB.Close()
 }
 
 // OpenDB will open or create the specified db. A function is returned that must
@@ -38,9 +48,12 @@ func OpenDB(directory string, config DBConfig) (*DB, error) {
 	// prepare logger
 	logger := &logger{fn: config.Logger}
 
+	// prepare cache
+	cache := pebble.NewCache(64 << 20)
+
 	// open db
 	pdb, err := pebble.Open(directory, &pebble.Options{
-		Cache:                       pebble.NewCache(64 << 20),
+		Cache:                       cache,
 		MemTableSize:                16 << 20,
 		MemTableStopWritesThreshold: 4,
 		MinFlushRate:                4 << 20,
@@ -60,6 +73,7 @@ func OpenDB(directory string, config DBConfig) (*DB, error) {
 	// create db
 	db := &DB{
 		DB: pdb,
+		ch: cache,
 		wo: &pebble.WriteOptions{Sync: config.SyncWrites},
 	}
 
