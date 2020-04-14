@@ -9,12 +9,12 @@ import (
 )
 
 func TestLedger(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
 	// open
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -30,11 +30,11 @@ func TestLedger(t *testing.T) {
 	tail := ledger.Tail()
 	assert.Equal(t, uint64(0), tail)
 
-	assert.Equal(t, map[string]string{}, dump(db))
+	assert.Equal(t, map[string]string{}, dump(m))
 
 	// write single
 
-	err = ledger.Write(Entry{Sequence: 1, Payload: []byte("foo")})
+	err = ledger.Write(Entry{Payload: []byte("foo")})
 	assert.NoError(t, err)
 
 	notification := <-ch
@@ -56,16 +56,16 @@ func TestLedger(t *testing.T) {
 	assert.Equal(t, uint64(0), tail)
 
 	assert.Equal(t, map[string]string{
-		"ledger!head":                 "1",
-		"ledger#00000000000000000001": "foo",
-	}, dump(db))
+		"ledger!head": "\x00\x00\x00\x00\x00\x00\x00\x01",
+		"ledger#\x00\x00\x00\x00\x00\x00\x00\x01": "foo",
+	}, dump(m))
 
 	// write multiple
 
 	err = ledger.Write(
-		Entry{Sequence: 2, Payload: []byte("bar")},
-		Entry{Sequence: 3, Payload: []byte("baz")},
-		Entry{Sequence: 4, Payload: []byte("qux")},
+		Entry{Payload: []byte("bar")},
+		Entry{Payload: []byte("baz")},
+		Entry{Payload: []byte("qux")},
 	)
 	assert.NoError(t, err)
 
@@ -91,21 +91,20 @@ func TestLedger(t *testing.T) {
 	assert.Equal(t, uint64(0), tail)
 
 	assert.Equal(t, map[string]string{
-		"ledger!head":                 "4",
-		"ledger#00000000000000000001": "foo",
-		"ledger#00000000000000000002": "bar",
-		"ledger#00000000000000000003": "baz",
-		"ledger#00000000000000000004": "qux",
-	}, dump(db))
+		"ledger!head": "\x00\x00\x00\x00\x00\x00\x00\x04",
+		"ledger#\x00\x00\x00\x00\x00\x00\x00\x01": "foo",
+		"ledger#\x00\x00\x00\x00\x00\x00\x00\x02": "bar",
+		"ledger#\x00\x00\x00\x00\x00\x00\x00\x03": "baz",
+		"ledger#\x00\x00\x00\x00\x00\x00\x00\x04": "qux",
+	}, dump(m))
 
 	// read partial
 
-	entries, err = ledger.Read(2, 10)
+	entries, err = ledger.Read(2, 2)
 	assert.NoError(t, err)
 	assert.Equal(t, []Entry{
 		{Sequence: 2, Payload: []byte("bar")},
 		{Sequence: 3, Payload: []byte("baz")},
-		{Sequence: 4, Payload: []byte("qux")},
 	}, entries)
 
 	// delete one
@@ -132,11 +131,12 @@ func TestLedger(t *testing.T) {
 	assert.Equal(t, uint64(1), tail)
 
 	assert.Equal(t, map[string]string{
-		"ledger!head":                 "4",
-		"ledger#00000000000000000002": "bar",
-		"ledger#00000000000000000003": "baz",
-		"ledger#00000000000000000004": "qux",
-	}, dump(db))
+		"ledger!head": "\x00\x00\x00\x00\x00\x00\x00\x04",
+		"ledger!tail": "\x00\x00\x00\x00\x00\x00\x00\x01",
+		"ledger#\x00\x00\x00\x00\x00\x00\x00\x02": "bar",
+		"ledger#\x00\x00\x00\x00\x00\x00\x00\x03": "baz",
+		"ledger#\x00\x00\x00\x00\x00\x00\x00\x04": "qux",
+	}, dump(m))
 
 	// delete multiple
 
@@ -160,28 +160,29 @@ func TestLedger(t *testing.T) {
 	assert.Equal(t, uint64(3), tail)
 
 	assert.Equal(t, map[string]string{
-		"ledger!head":                 "4",
-		"ledger#00000000000000000004": "qux",
-	}, dump(db))
+		"ledger!head": "\x00\x00\x00\x00\x00\x00\x00\x04",
+		"ledger!tail": "\x00\x00\x00\x00\x00\x00\x00\x03",
+		"ledger#\x00\x00\x00\x00\x00\x00\x00\x04": "qux",
+	}, dump(m))
 }
 
 func TestLedgerDeleteOutOfRange(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
 	err = ledger.Write(
-		Entry{Sequence: 2, Payload: []byte("foo")},
-		Entry{Sequence: 3, Payload: []byte("bar")},
-		Entry{Sequence: 4, Payload: []byte("baz")},
-		Entry{Sequence: 5, Payload: []byte("qux")},
+		Entry{Payload: []byte("foo")},
+		Entry{Payload: []byte("bar")},
+		Entry{Payload: []byte("baz")},
+		Entry{Payload: []byte("qux")},
 	)
 	assert.NoError(t, err)
 
-	n, err := ledger.Delete(1)
+	n, err := ledger.Delete(0)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, n)
 
@@ -189,18 +190,37 @@ func TestLedgerDeleteOutOfRange(t *testing.T) {
 	assert.Equal(t, 4, length)
 
 	tail := ledger.Tail()
-	assert.Equal(t, uint64(1), tail)
+	assert.Equal(t, uint64(0), tail)
+
+	n, err = ledger.Delete(2)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, n)
+
+	length = ledger.Length()
+	assert.Equal(t, 2, length)
+
+	tail = ledger.Tail()
+	assert.Equal(t, uint64(2), tail)
+
+	n, err = ledger.Delete(1)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, n)
 }
 
 func TestLedgerIndex(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
 	index, found, err := ledger.Index(0)
+	assert.NoError(t, err)
+	assert.False(t, found)
+	assert.Equal(t, uint64(0), index)
+
+	index, found, err = ledger.Index(-1)
 	assert.NoError(t, err)
 	assert.False(t, found)
 	assert.Equal(t, uint64(0), index)
@@ -216,10 +236,10 @@ func TestLedgerIndex(t *testing.T) {
 	assert.Equal(t, uint64(0), index)
 
 	err = ledger.Write(
-		Entry{Sequence: 1, Payload: []byte("foo")},
-		Entry{Sequence: 2, Payload: []byte("bar")},
-		Entry{Sequence: 3, Payload: []byte("baz")},
-		Entry{Sequence: 4, Payload: []byte("qux")},
+		Entry{Payload: []byte("foo")},
+		Entry{Payload: []byte("bar")},
+		Entry{Payload: []byte("baz")},
+		Entry{Payload: []byte("qux")},
 	)
 	assert.NoError(t, err)
 
@@ -241,12 +261,12 @@ func TestLedgerIndex(t *testing.T) {
 	index, found, err = ledger.Index(4)
 	assert.NoError(t, err)
 	assert.False(t, found)
-	assert.Equal(t, uint64(0), index)
+	assert.Equal(t, uint64(4), index)
 
 	index, found, err = ledger.Index(-5)
 	assert.NoError(t, err)
 	assert.False(t, found)
-	assert.Equal(t, uint64(0), index)
+	assert.Equal(t, uint64(1), index)
 
 	n, err := ledger.Delete(4)
 	assert.NoError(t, err)
@@ -256,74 +276,52 @@ func TestLedgerIndex(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, found)
 	assert.Equal(t, uint64(0), index)
+
+	assert.Equal(t, map[string]string{
+		"ledger!head": "\x00\x00\x00\x00\x00\x00\x00\x04",
+		"ledger!tail": "\x00\x00\x00\x00\x00\x00\x00\x04",
+	}, dump(m))
 }
 
 func TestLedgerIsolation(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	set(db, "00000000000000000001", "a")
-	set(db, "e:00000000000000000002", "b")
-	set(db, "ledger!head", "3")
-	set(db, "ledger#00000000000000000003", "c")
-	set(db, "ledger#00000000000000000003", "c")
-	set(db, "z-ledger#00000000000000000004", "d")
+	set(m, "\x00\x00\x00\x00\x00\x00\x00\x01", "a")
+	set(m, "e:\x00\x00\x00\x00\x00\x00\x00\x01", "b")
+	set(m, "ledger!head", "\x00\x00\x00\x00\x00\x00\x00\x01")
+	set(m, "ledger#\x00\x00\x00\x00\x00\x00\x00\x01", "c")
+	set(m, "z-ledger#\x00\x00\x00\x00\x00\x00\x00\x01", "d")
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
 	entries, err := ledger.Read(0, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, []Entry{
-		{Sequence: 3, Payload: []byte("c")},
+		{Sequence: 1, Payload: []byte("c")},
 	}, entries)
 
 	length := ledger.Length()
 	assert.Equal(t, 1, length)
 
 	head := ledger.Head()
-	assert.Equal(t, uint64(3), head)
-}
-
-func TestLedgerMonotonicity(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
-
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
-	assert.NoError(t, err)
-	assert.NotNil(t, ledger)
-
-	err = ledger.Write(Entry{Sequence: 2, Payload: []byte("foo")})
-	assert.NoError(t, err)
-
-	err = ledger.Write(Entry{Sequence: 1, Payload: []byte("foo")})
-	assert.Equal(t, ErrNotMonotonic, err)
-
-	err = ledger.Write(Entry{Sequence: 2, Payload: []byte("foo")})
-	assert.Equal(t, ErrNotMonotonic, err)
-
-	err = ledger.Write(
-		Entry{Sequence: 4, Payload: []byte("foo")},
-		Entry{Sequence: 3, Payload: []byte("foo")},
-	)
-	assert.Equal(t, ErrNotMonotonic, err)
+	assert.Equal(t, uint64(1), head)
 }
 
 func TestLedgerReopen(t *testing.T) {
-	db := openDB(true)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
 	err = ledger.Write(Entry{Sequence: 1, Payload: []byte("foo")})
 	assert.NoError(t, err)
 
-	closeDB(db)
-	db = openDB(false)
-
-	ledger, err = CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err = CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -338,14 +336,13 @@ func TestLedgerReopen(t *testing.T) {
 
 	head := ledger.Head()
 	assert.Equal(t, uint64(1), head)
-
-	closeDB(db)
 }
 
 func TestLedgerReopenCollapsed(t *testing.T) {
-	db := openDB(true)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -355,10 +352,7 @@ func TestLedgerReopenCollapsed(t *testing.T) {
 	_, err = ledger.Delete(1)
 	assert.NoError(t, err)
 
-	closeDB(db)
-	db = openDB(false)
-
-	ledger, err = CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err = CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -367,17 +361,15 @@ func TestLedgerReopenCollapsed(t *testing.T) {
 
 	head := ledger.Head()
 	assert.Equal(t, uint64(1), head)
-
-	closeDB(db)
 }
 
 func TestLedgerHugeDelete(t *testing.T) {
 	N := 10000
 
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -397,26 +389,27 @@ func TestLedgerHugeDelete(t *testing.T) {
 
 	n, err := ledger.Delete(uint64(N + 10))
 	assert.NoError(t, err)
-	assert.Equal(t, int(N+10), n)
+	assert.Equal(t, N+10, n)
 
 	length := ledger.Length()
 	assert.Equal(t, 0, length)
 
 	assert.Equal(t, map[string]string{
-		"ledger!head": "10010",
-	}, dump(db))
+		"ledger!head": "\x00\x00\x00\x00\x00\x00'\x1a",
+		"ledger!tail": "\x00\x00\x00\x00\x00\x00'\x1a",
+	}, dump(m))
 }
 
 func TestLedgerFastDelete(t *testing.T) {
 	N := 10000
 
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{
+	ledger, err := CreateLedger(m, LedgerConfig{
 		Prefix: "ledger",
-		Cache:  int(N + 10),
-		Limit:  int(N + 10),
+		Cache:  N + 10,
+		Limit:  N + 10,
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
@@ -437,30 +430,31 @@ func TestLedgerFastDelete(t *testing.T) {
 
 	n, err := ledger.Delete(uint64(N + 10))
 	assert.NoError(t, err)
-	assert.Equal(t, int(N+10), n)
+	assert.Equal(t, N+10, n)
 
 	length := ledger.Length()
 	assert.Equal(t, 0, length)
 
 	assert.Equal(t, map[string]string{
-		"ledger!head": "10010",
-	}, dump(db))
+		"ledger!head": "\x00\x00\x00\x00\x00\x00'\x1a",
+		"ledger!tail": "\x00\x00\x00\x00\x00\x00'\x1a",
+	}, dump(m))
 }
 
 func TestLedgerCache(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Cache: 3})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger", Cache: 3})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
-	err = ledger.Write(Entry{Sequence: 1, Payload: []byte("foo"), Object: 1})
+	err = ledger.Write(Entry{Payload: []byte("foo"), Object: 1})
 	assert.NoError(t, err)
 
 	// force cache preload
 
-	ledger, err = CreateLedger(db, LedgerConfig{Prefix: "ledger", Cache: 3})
+	ledger, err = CreateLedger(m, LedgerConfig{Prefix: "ledger", Cache: 3})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -473,9 +467,9 @@ func TestLedgerCache(t *testing.T) {
 	}, entries)
 
 	err = ledger.Write(
-		Entry{Sequence: 2, Payload: []byte("bar"), Object: 2},
-		Entry{Sequence: 3, Payload: []byte("baz"), Object: 3},
-		Entry{Sequence: 4, Payload: []byte("qux"), Object: 4},
+		Entry{Payload: []byte("bar"), Object: 2},
+		Entry{Payload: []byte("baz"), Object: 3},
+		Entry{Payload: []byte("qux"), Object: 4},
 	)
 	assert.NoError(t, err)
 
@@ -495,9 +489,9 @@ func TestLedgerCache(t *testing.T) {
 	entries, err = ledger.Read(2, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, []Entry{
-		{Sequence: 2, Payload: []byte("bar"), Object: 2},
-		{Sequence: 3, Payload: []byte("baz"), Object: 3},
-		{Sequence: 4, Payload: []byte("qux"), Object: 4},
+		{Sequence: 2, Payload: []byte("bar")}, // , Object: 2
+		{Sequence: 3, Payload: []byte("baz")}, // , Object: 3
+		{Sequence: 4, Payload: []byte("qux")}, // , Object: 4
 	}, entries)
 
 	// cache invalidation
@@ -515,10 +509,10 @@ func TestLedgerCache(t *testing.T) {
 }
 
 func TestLedgerIndexCache(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Cache: 100})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger", Cache: 100})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
@@ -563,12 +557,12 @@ func TestLedgerIndexCache(t *testing.T) {
 	index, found, err = ledger.Index(4)
 	assert.NoError(t, err)
 	assert.False(t, found)
-	assert.Equal(t, uint64(0), index)
+	assert.Equal(t, uint64(4), index)
 
 	index, found, err = ledger.Index(-5)
 	assert.NoError(t, err)
 	assert.False(t, found)
-	assert.Equal(t, uint64(0), index)
+	assert.Equal(t, uint64(1), index)
 
 	n, err := ledger.Delete(4)
 	assert.NoError(t, err)
@@ -581,49 +575,49 @@ func TestLedgerIndexCache(t *testing.T) {
 }
 
 func TestLedgerLimit(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Limit: 3})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger", Limit: 3})
 	assert.NoError(t, err)
 	assert.NotNil(t, ledger)
 
 	err = ledger.Write(
-		Entry{Sequence: 1, Payload: []byte("bar")},
-		Entry{Sequence: 2, Payload: []byte("baz")},
-		Entry{Sequence: 3, Payload: []byte("qux")},
-		Entry{Sequence: 4, Payload: []byte("qux")},
+		Entry{Payload: []byte("bar")},
+		Entry{Payload: []byte("baz")},
+		Entry{Payload: []byte("qux")},
+		Entry{Payload: []byte("qux")},
 	)
 	assert.Equal(t, ErrLimitReached, err)
 
 	err = ledger.Write(
-		Entry{Sequence: 1, Payload: []byte("bar")},
-		Entry{Sequence: 2, Payload: []byte("baz")},
+		Entry{Payload: []byte("bar")},
+		Entry{Payload: []byte("baz")},
 	)
 	assert.NoError(t, err)
 
 	err = ledger.Write(
-		Entry{Sequence: 3, Payload: []byte("qux")},
-		Entry{Sequence: 4, Payload: []byte("qux")},
+		Entry{Payload: []byte("qux")},
+		Entry{Payload: []byte("qux")},
 	)
 	assert.Equal(t, ErrLimitReached, err)
 
 	err = ledger.Write(
-		Entry{Sequence: 3, Payload: []byte("bar")},
+		Entry{Payload: []byte("bar")},
 	)
 	assert.NoError(t, err)
 
 	err = ledger.Write(
-		Entry{Sequence: 4, Payload: []byte("qux")},
+		Entry{Payload: []byte("qux")},
 	)
 	assert.Equal(t, ErrLimitReached, err)
 }
 
 func BenchmarkLedgerWrite(b *testing.B) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Cache: 1000})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger", Cache: 1000})
 	if err != nil {
 		panic(err)
 	}
@@ -639,7 +633,7 @@ func BenchmarkLedgerWrite(b *testing.B) {
 	batch := make([]Entry, 0, size)
 
 	for i := 1; i <= b.N; i++ {
-		batch = append(batch, Entry{Sequence: uint64(i), Payload: payload})
+		batch = append(batch, Entry{Payload: payload})
 
 		if len(batch) == size {
 			err = ledger.Write(batch...)
@@ -657,15 +651,13 @@ func BenchmarkLedgerWrite(b *testing.B) {
 			panic(err)
 		}
 	}
-
-	b.StopTimer()
 }
 
 func BenchmarkLedgerRead(b *testing.B) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Cache: 1000})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger", Cache: 1000})
 	if err != nil {
 		panic(err)
 	}
@@ -677,7 +669,7 @@ func BenchmarkLedgerRead(b *testing.B) {
 
 	batch := make([]Entry, 0, size)
 	for i := 1; i <= size; i++ {
-		batch = append(batch, Entry{Sequence: uint64(i), Payload: payload})
+		batch = append(batch, Entry{Payload: payload})
 	}
 
 	err = ledger.Write(batch...)
@@ -694,15 +686,13 @@ func BenchmarkLedgerRead(b *testing.B) {
 			panic(err)
 		}
 	}
-
-	b.StopTimer()
 }
 
 func BenchmarkLedgerDelete(b *testing.B) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger", Cache: 1000, Limit: 1000})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger", Cache: 1000, Limit: 1000})
 	if err != nil {
 		panic(err)
 	}
@@ -714,7 +704,7 @@ func BenchmarkLedgerDelete(b *testing.B) {
 
 	batch := make([]Entry, 0, size)
 	for i := 1; i <= size; i++ {
-		batch = append(batch, Entry{Sequence: uint64(i), Payload: payload})
+		batch = append(batch, Entry{Payload: payload})
 	}
 
 	err = ledger.Write(batch...)
@@ -731,6 +721,4 @@ func BenchmarkLedgerDelete(b *testing.B) {
 			panic(err)
 		}
 	}
-
-	b.StopTimer()
 }

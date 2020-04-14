@@ -1,17 +1,15 @@
 package quasar
 
 import (
-	"bytes"
 	"errors"
-	"math"
-	"strconv"
 	"sync"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/256dpi/turing"
+
+	"github.com/256dpi/quasar/qis"
 )
 
-// ErrNotMonotonic is returned for write attempts that are not monotonic.
-var ErrNotMonotonic = errors.New("not monotonic")
+// TODO: We use head and tail the wrong way around. Let's correct it.
 
 // ErrLimitReached is returned for write attempts that go beyond the allowed
 // ledger length.
@@ -19,7 +17,7 @@ var ErrLimitReached = errors.New("limit reached")
 
 // Entry is a single entry in the ledger.
 type Entry struct {
-	// The entries sequence (must be greater than zero).
+	// The entries sequence.
 	Sequence uint64
 
 	// The entries payload that is written to disk.
@@ -43,27 +41,26 @@ type LedgerConfig struct {
 	Limit int
 }
 
+// TODO: Allow concurrent access.
+
 // Ledger manages the storage of sequential entries.
 type Ledger struct {
-	db     *DB
-	config LedgerConfig
+	machine *turing.Machine
+	config  LedgerConfig
 
-	cache       *Buffer
-	entryPrefix []byte
-	fieldPrefix []byte
-
+	cache     *Buffer
+	observer  *ledgerObserver
 	receivers map[chan<- uint64]struct{}
 
-	length int
-	head   uint64
-	tail   uint64
-	mutex  sync.Mutex
+	head  uint64
+	tail  uint64
+	mutex sync.Mutex
 }
 
 // CreateLedger will create a ledger that stores entries in the provided db.
-// Read, write and delete requested can be issued concurrently to maximize
-// performance. However, only one goroutine may write entries at the same time.
-func CreateLedger(db *DB, config LedgerConfig) (*Ledger, error) {
+// Read, write and delete requests can be issued concurrently to maximize
+// performance.
+func CreateLedger(machine *turing.Machine, config LedgerConfig) (*Ledger, error) {
 	// check prefix
 	if config.Prefix == "" {
 		panic("quasar: missing prefix")
@@ -77,12 +74,10 @@ func CreateLedger(db *DB, config LedgerConfig) (*Ledger, error) {
 
 	// create ledger
 	l := &Ledger{
-		db:          db,
-		config:      config,
-		cache:       cache,
-		entryPrefix: append([]byte(config.Prefix), '#'),
-		fieldPrefix: append([]byte(config.Prefix), '!'),
-		receivers:   make(map[chan<- uint64]struct{}),
+		machine:   machine,
+		config:    config,
+		cache:     cache,
+		receivers: make(map[chan<- uint64]struct{}),
 	}
 
 	// init ledger
@@ -95,173 +90,108 @@ func CreateLedger(db *DB, config LedgerConfig) (*Ledger, error) {
 }
 
 func (l *Ledger) init() error {
-	// prepare length and head
-	var length int
-	var head uint64
-	var tail uint64
-
-	// create iterator
-	iter := l.db.NewIter(prefixIterator(l.entryPrefix))
-	defer iter.Close()
-
-	// compute start
-	start := l.makeEntryKey(0)
-
-	// read all entries
-	for iter.SeekGE(start); iter.Valid(); iter.Next() {
-		// increment length
-		length++
-
-		// parse key
-		seq, err := DecodeSequence(iter.Key()[len(l.entryPrefix):])
-		if err != nil {
-			return err
-		}
-
-		// set head
-		head = seq
-
-		// set tail
-		if tail == 0 {
-			tail = seq
-		}
-
-		// cache entry
-		if l.cache != nil {
-			// prepare value
-			value := make([]byte, len(iter.Value()))
-			copy(value, iter.Value())
-
-			// store entry
-			l.cache.Push(Entry{
-				Sequence: seq,
-				Payload:  value,
-			})
-		}
+	// prepare stat
+	stat := qis.Stat{
+		Prefix: []byte(l.config.Prefix),
 	}
 
-	// check errors
-	err := iter.Error()
+	// execute stat
+	err := l.machine.Execute(&stat)
 	if err != nil {
 		return err
 	}
 
-	// read stored head if collapsed
-	if length <= 0 {
-		// read stored head
-		value, closer, err := l.db.Get(l.makeFieldKey("head"))
-		if err != nil && err != pebble.ErrNotFound {
-			return err
+	// set values
+	l.head = stat.Head
+	l.tail = stat.Tail
+
+	// fill cache
+	if l.cache != nil {
+		// prepare read
+		read := qis.Read{
+			Prefix: []byte(l.config.Prefix),
+			Limit:  100,
 		}
 
-		// ensure close
-		if err == nil {
-			defer closer.Close()
+		// prepare start
+		read.Start = l.tail
+		if int(l.head-read.Start) > l.config.Cache {
+			read.Start = l.head - uint64(l.config.Cache)
 		}
 
-		// parse head if present
-		if value != nil {
-			head, err = DecodeSequence(value)
+		// read entries
+		for read.Start < l.head {
+			// execute read
+			err = l.machine.Execute(&read)
 			if err != nil {
 				return err
 			}
+
+			// add entries
+			for i, entry := range read.Entries {
+				l.cache.Push(Entry{
+					Sequence: read.Start + uint64(i),
+					Payload:  entry,
+				})
+			}
+
+			// increment
+			read.Start += uint64(len(read.Entries))
 		}
 	}
 
-	// set tail to head if collapsed
-	if tail == 0 {
-		tail = head
-	}
+	// create observer
+	l.observer = &ledgerObserver{ledger: l}
 
-	// set length and head
-	l.length = length
-	l.head = head
-	l.tail = tail
+	// subscribe ledger observer
+	l.machine.Subscribe(l.observer)
 
 	return nil
 }
 
 // Write will write the specified entries to the ledger. No entries have been
-// written if an error has been returned. Monotonicity of the written entries
-// is checked against the current head.
+// written if an error has been returned.
 func (l *Ledger) Write(entries ...Entry) error {
 	// acquire mutex
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
-	// get head and length
-	head := l.head
-	length := l.length
-
-	// check length
-	if l.config.Limit > 0 && length+len(entries) > l.config.Limit {
+	// check limit if available
+	if l.config.Limit > 0 && int(l.head-l.tail)+len(entries) > l.config.Limit {
 		return ErrLimitReached
 	}
 
-	// check and update head
-	for _, entry := range entries {
-		// return immediately if not monotonic
-		if entry.Sequence <= head {
-			return ErrNotMonotonic
-		}
-
-		// set head
-		head = entry.Sequence
+	// prepare write
+	write := qis.Write{
+		Prefix:  []byte(l.config.Prefix),
+		Entries: make([][]byte, 0, len(entries)),
 	}
 
-	// prepare batch
-	batch := l.db.NewBatch()
-	defer batch.Close()
-
-	// add all entries
+	// append entries
 	for _, entry := range entries {
-		err := batch.Set(l.makeEntryKey(entry.Sequence), entry.Payload, l.db.wo)
-		if err != nil {
-			return err
-		}
+		write.Entries = append(write.Entries, entry.Payload)
 	}
 
-	// add head
-	err := batch.Set(l.makeFieldKey("head"), []byte(strconv.FormatUint(head, 10)), l.db.wo)
+	// execute write
+	err := l.machine.Execute(&write)
 	if err != nil {
 		return err
 	}
 
-	// perform write
-	err = batch.Commit(l.db.wo)
-	if err != nil {
-		return err
-	}
-
-	// set length and head
-	l.length += len(entries)
-	l.head = head
-
-	// cache all entries
-	if l.cache != nil {
-		l.cache.Push(entries...)
-	}
-
-	// send notifications to all receivers and skip full receivers
-	for receiver := range l.receivers {
-		select {
-		case receiver <- head:
-		default:
-		}
-	}
+	// TODO: Write sequence to entries?
 
 	return nil
 }
 
 // Read will read entries from and including the specified sequence up to the
-// requested amount of entries.
-func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
+// requested limit of entries.
+func (l *Ledger) Read(sequence uint64, limit int) ([]Entry, error) {
 	// acquire mutex
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
 	// prepare list
-	list := make([]Entry, 0, amount)
+	list := make([]Entry, 0, limit)
 
 	// attempt to read from cache if available
 	if l.cache != nil {
@@ -278,7 +208,7 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 			// otherwise add item if in range and stop if list is full
 			if entry.Sequence >= sequence {
 				list = append(list, entry)
-				if len(list) >= amount {
+				if len(list) >= limit {
 					return false
 				}
 			}
@@ -295,36 +225,25 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 		return list, nil
 	}
 
-	// create iterator
-	iter := l.db.NewIter(prefixIterator(l.entryPrefix))
-	defer iter.Close()
-
-	// compute start
-	start := l.makeEntryKey(sequence)
-
-	// read all keys
-	for iter.SeekGE(start); iter.Valid() && len(list) < amount; iter.Next() {
-		// prepare value
-		value := make([]byte, len(iter.Value()))
-		copy(value, iter.Value())
-
-		// parse key
-		seq, err := DecodeSequence(iter.Key()[len(l.entryPrefix):])
-		if err != nil {
-			return nil, err
-		}
-
-		// add entry
-		list = append(list, Entry{
-			Sequence: seq,
-			Payload:  value,
-		})
+	// prepare read
+	read := qis.Read{
+		Prefix: []byte(l.config.Prefix),
+		Start:  sequence,
+		Limit:  uint16(limit),
 	}
 
-	// check errors
-	err := iter.Error()
+	// execute read
+	err := l.machine.Execute(&read)
 	if err != nil {
 		return nil, err
+	}
+
+	// append entries
+	for i, entry := range read.Entries {
+		list = append(list, Entry{
+			Sequence: read.Start + uint64(i),
+			Payload:  entry,
+		})
 	}
 
 	return list, nil
@@ -333,7 +252,7 @@ func (l *Ledger) Read(sequence uint64, amount int) ([]Entry, error) {
 // Index will return the sequence of the specified index in the ledger. Negative
 // indexes are counted backwards from the head. If the index exceeds the current
 // length, the sequence of the last entry and false is returned. If the ledger
-// is empty the current head (zero if unused) and false will be returned.
+// is empty zero and false will be returned.
 func (l *Ledger) Index(index int) (uint64, bool, error) {
 	// acquire mutex
 	l.mutex.Lock()
@@ -348,82 +267,30 @@ func (l *Ledger) Index(index int) (uint64, bool, error) {
 		index--
 	}
 
-	// lookup backward index in cache if available
-	if backward && l.cache != nil {
-		entry, ok := l.cache.Index((index + 1) * -1)
-		if ok {
-			return entry.Sequence, true, nil
-		}
-	}
-
-	// prepare sequence and existing
-	var sequence uint64
-	var existing bool
-
-	// create iterator
-	iter := l.db.NewIter(prefixIterator(l.entryPrefix))
-	defer iter.Close()
-
-	// compute start
-	start := l.makeEntryKey(0)
-	if backward {
-		start = l.makeEntryKey(math.MaxUint64)
-	}
-
-	// prepare seek
-	seek := func() { iter.SeekGE(start) }
-	if backward {
-		seek = func() { iter.SeekLT(start) }
-	}
-
-	// prepare next
-	next := func() { iter.Next() }
-	if backward {
-		next = func() { iter.Prev() }
-	}
-
-	// prepare counter
-	counter := 0
-
-	// read all keys
-	for seek(); iter.Valid(); next() {
-		// increment counter
-		counter++
-
-		// check counter
-		if counter >= (index + 1) {
-			// parse key
-			seq, err := DecodeSequence(iter.Key()[len(l.entryPrefix):])
-			if err != nil {
-				return 0, false, err
-			}
-
-			// set sequence
-			sequence = seq
-
-			// set flag
-			existing = true
-
-			break
-		}
-	}
-
-	// check errors
-	err := iter.Error()
-	if err != nil {
-		return 0, false, err
-	}
-
-	// check existing
-	if !existing {
+	// check empty
+	if l.head-l.tail == 0 {
 		return 0, false, nil
 	}
 
-	return sequence, true, nil
+	// check length
+	if index >= int(l.head-l.tail) {
+		if backward {
+			return l.tail + 1, false, nil
+		}
+		return l.head, false, nil
+	}
+
+	// compute sequence
+	seq := l.tail + 1 + uint64(index)
+	if backward {
+		seq = l.head - uint64(index)
+	}
+
+	return seq, true, nil
 }
 
 // Delete will remove all entries up to and including the specified sequence
-// from the ledger.
+// from the ledger. It will return the number of deleted entries.
 func (l *Ledger) Delete(sequence uint64) (int, error) {
 	// acquire mutex
 	l.mutex.Lock()
@@ -435,89 +302,23 @@ func (l *Ledger) Delete(sequence uint64) (int, error) {
 	}
 
 	// skip if ledger is empty or sequence is at or behind tail
-	if l.length == 0 || sequence <= l.tail {
+	if l.head-l.tail == 0 || sequence <= l.tail {
 		return 0, nil
 	}
 
-	// prepare counter
-	var counter int
-
-	// determine if ledger is fully cached
-	fullyCached := l.config.Cache > 0 && l.config.Limit > 0 && l.config.Cache >= l.config.Limit
-
-	// count entries from index or database
-	if fullyCached {
-		// read from cache
-		l.cache.Scan(func(entry Entry) bool {
-			// check if done
-			if entry.Sequence > sequence {
-				return false
-			}
-
-			// increment counter
-			counter++
-
-			return true
-		})
-	} else {
-		// create iterator
-		iter := l.db.NewIter(prefixIterator(l.entryPrefix))
-		defer iter.Close()
-
-		// compute start
-		start := l.makeEntryKey(0)
-
-		// compute needle
-		needle := l.makeEntryKey(sequence)
-
-		// count all deletable entries
-		for iter.SeekGE(start); iter.Valid(); iter.Next() {
-			// stop if key is after needle
-			if bytes.Compare(iter.Key(), needle) > 0 {
-				break
-			}
-
-			// increment counter
-			counter++
-		}
-
-		// check errors
-		err := iter.Error()
-		if err != nil {
-			return 0, err
-		}
+	// prepare trim
+	trim := qis.Trim{
+		Prefix:   []byte(l.config.Prefix),
+		Sequence: sequence,
 	}
 
-	// prepare batch
-	batch := l.db.NewBatch()
-	defer batch.Close()
-
-	// delete entries
-	err := batch.DeleteRange(l.makeEntryKey(l.tail+1), l.makeEntryKey(sequence+1), l.db.wo)
+	// execute trim
+	err := l.machine.Execute(&trim)
 	if err != nil {
 		return 0, err
 	}
 
-	// write batch
-	err = batch.Commit(l.db.wo)
-	if err != nil {
-		return 0, err
-	}
-
-	// decrement length
-	l.length -= counter
-
-	// set tail
-	l.tail = sequence
-
-	// remove deleted entries from cache
-	if l.cache != nil {
-		l.cache.Trim(func(entry Entry) bool {
-			return entry.Sequence <= sequence
-		})
-	}
-
-	return counter, nil
+	return int(trim.Deleted), nil
 }
 
 // Length will return the number of stored entries.
@@ -526,7 +327,7 @@ func (l *Ledger) Length() int {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
-	return l.length
+	return int(l.head - l.tail)
 }
 
 // Head will return the last committed sequence. This value can be checked
@@ -571,12 +372,57 @@ func (l *Ledger) Unsubscribe(receiver chan<- uint64) {
 	delete(l.receivers, receiver)
 }
 
-func (l *Ledger) makeEntryKey(seq uint64) []byte {
-	b := make([]byte, 0, len(l.entryPrefix)+EncodedSequenceLength)
-	return append(append(b, l.entryPrefix...), EncodeSequence(seq, false)...)
+func (l *Ledger) onPush(push *qis.Write) {
+	// cache entries if available
+	if l.cache != nil {
+		for i, entry := range push.Entries {
+			l.cache.Push(Entry{
+				Sequence: push.Head - uint64(len(push.Entries)-(i+1)),
+				Payload:  entry,
+			})
+		}
+	}
+
+	// update head
+	l.head = push.Head
+
+	// send notifications to all receivers and skip full receivers
+	for receiver := range l.receivers {
+		select {
+		case receiver <- l.head:
+		default:
+		}
+	}
 }
 
-func (l *Ledger) makeFieldKey(name string) []byte {
-	b := make([]byte, 0, len(l.fieldPrefix)+len(name))
-	return append(append(b, l.fieldPrefix...), name...)
+func (l *Ledger) onDelete(delete *qis.Trim) {
+	// remove deleted entries from cache
+	if l.cache != nil {
+		l.cache.Trim(func(entry Entry) bool {
+			return entry.Sequence <= delete.Sequence
+		})
+	}
+
+	// set tail
+	l.tail = delete.Sequence
+}
+
+type ledgerObserver struct {
+	ledger *Ledger
+}
+
+func (l *ledgerObserver) Init() {
+	// TODO: Reset?
+}
+
+func (l *ledgerObserver) Process(ins turing.Instruction) bool {
+	// process instruction
+	switch ins := ins.(type) {
+	case *qis.Write:
+		l.ledger.onPush(ins)
+	case *qis.Trim:
+		l.ledger.onDelete(ins)
+	}
+
+	return true
 }

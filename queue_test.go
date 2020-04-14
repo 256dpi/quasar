@@ -8,10 +8,10 @@ import (
 )
 
 func TestQueue(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	queue, err := CreateQueue(db, QueueConfig{
+	queue, err := CreateQueue(m, QueueConfig{
 		Prefix:         "queue",
 		LedgerCache:    10,
 		CleanRetention: 20,

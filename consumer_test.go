@@ -9,13 +9,13 @@ import (
 )
 
 func TestConsumer(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -97,13 +97,13 @@ func TestConsumer(t *testing.T) {
 }
 
 func TestConsumerWindow(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -187,13 +187,13 @@ func TestConsumerWindow(t *testing.T) {
 }
 
 func TestConsumerCumulativeMarks(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -246,13 +246,13 @@ func TestConsumerCumulativeMarks(t *testing.T) {
 }
 
 func TestConsumerMissedMark(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -305,10 +305,10 @@ func TestConsumerMissedMark(t *testing.T) {
 }
 
 func TestConsumerTemporary(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -376,13 +376,13 @@ func TestConsumerTemporary(t *testing.T) {
 }
 
 func TestConsumerUnorderedMarks(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -449,13 +449,13 @@ func TestConsumerUnorderedMarks(t *testing.T) {
 }
 
 func TestConsumerSlowLedger(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	entries := make(chan Entry, 1)
@@ -511,13 +511,13 @@ func TestConsumerSlowLedger(t *testing.T) {
 }
 
 func TestConsumerSkipMark(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -607,13 +607,13 @@ func TestConsumerSkipMark(t *testing.T) {
 }
 
 func TestConsumerSkipMarkTimeout(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -677,13 +677,13 @@ func TestConsumerSkipMarkTimeout(t *testing.T) {
 }
 
 func TestConsumerUnblock(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	err = ledger.Write(Entry{
@@ -721,13 +721,13 @@ func TestConsumerUnblock(t *testing.T) {
 }
 
 func TestConsumerResumeOutOfRange(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	for i := 1; i <= 100; i++ {
@@ -818,13 +818,13 @@ func TestConsumerResumeOutOfRange(t *testing.T) {
 }
 
 func TestConsumerInvalidSequence(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	ledger, err := CreateLedger(db, LedgerConfig{Prefix: "ledger"})
+	ledger, err := CreateLedger(m, LedgerConfig{Prefix: "ledger"})
 	assert.NoError(t, err)
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 
 	consumer := NewConsumer(ledger, table, ConsumerConfig{

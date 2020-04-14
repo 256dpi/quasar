@@ -1,68 +1,47 @@
 package quasar
 
 import (
-	"os"
-	"path/filepath"
+	"github.com/256dpi/turing"
+	"github.com/256dpi/turing/stdset"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/256dpi/quasar/qis"
 )
 
-func openDB(clear bool) *DB {
-	// make dir absolute
-	dir, err := filepath.Abs(filepath.Join("test"))
-	if err != nil {
-		panic(err)
-	}
-
-	// clear directory
-	if clear {
-		err = os.RemoveAll(dir)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	// open db
-	db, err := OpenDB(dir, DBConfig{})
-	if err != nil {
-		panic(err)
-	}
-
-	return db
+func init() {
+	turing.SetLogger(nil)
 }
 
-func closeDB(db *DB) {
-	err := db.Close()
-	if err != nil {
-		panic(err)
-	}
+func startMachine() *turing.Machine {
+	return turing.Test(
+		&qis.Write{}, &qis.Read{}, &qis.Stat{}, &qis.Trim{},
+		&qis.List{}, &qis.Store{}, &qis.Load{},
+		&stdset.Set{}, &stdset.Map{},
+	)
 }
 
-func set(db *DB, key, value string) {
+func set(m *turing.Machine, key, value string) {
 	// set entry
-	err := db.Set([]byte(key), []byte(value), pebble.Sync)
+	err := m.Execute(&stdset.Set{
+		Key:   []byte(key),
+		Value: []byte(value),
+	})
 	if err != nil {
 		panic(err)
 	}
 }
 
-func dump(db *DB) map[string]string {
-	// prepare map
-	data := map[string]string{}
-
-	// create iterator
-	iter := db.NewIter(&pebble.IterOptions{})
-	defer iter.Close()
-
-	// read all keys
-	for iter.SeekGE(nil); iter.Valid(); iter.Next() {
-		data[string(iter.Key())] = string(iter.Value())
-	}
-
-	// check errors
-	err := iter.Error()
+func dump(m *turing.Machine) map[string]string {
+	// map keys
+	mp := &stdset.Map{}
+	err := m.Execute(mp)
 	if err != nil {
 		panic(err)
+	}
+
+	// build map
+	data := map[string]string{}
+	for key, value := range mp.Pairs {
+		data[key] = string(value)
 	}
 
 	return data

@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"gopkg.in/tomb.v2"
+
+	"github.com/256dpi/quasar/seq"
 )
 
 // ErrInvalidSequence is yielded to callbacks if the provided sequences that has
@@ -221,7 +223,7 @@ func (c *Consumer) worker() error {
 		// store potentially uncommitted markers if skip is enabled
 		if c.table != nil && len(skipped) > 0 {
 			// compile markers
-			list := CompileSequences(markers)
+			list := seq.Compile(markers)
 
 			// store markers in table
 			err := c.table.Set(c.config.Name, list)
@@ -348,7 +350,7 @@ func (c *Consumer) worker() error {
 			}
 
 			// compile markers
-			list := CompileSequences(markers)
+			list := seq.Compile(markers)
 
 			// store markers in table
 			err := c.table.Set(c.config.Name, list)
@@ -385,7 +387,7 @@ func (c *Consumer) worker() error {
 			dynTimeout = nil
 		case <-dynTimeout:
 			// compile markers
-			list := CompileSequences(markers)
+			list := seq.Compile(markers)
 
 			// store markers in table
 			err := c.table.Set(c.config.Name, list)

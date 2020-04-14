@@ -3,7 +3,9 @@ package quasar
 import (
 	"sync"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/256dpi/turing"
+
+	"github.com/256dpi/quasar/qis"
 )
 
 // TableConfig is used to configure a table.
@@ -17,15 +19,15 @@ type TableConfig struct {
 
 // Table manages the storage of positions markers.
 type Table struct {
-	db     *DB
-	config TableConfig
-	prefix []byte
-	cache  map[string][]uint64
-	mutex  sync.Mutex
+	machine *turing.Machine
+	config  TableConfig
+	prefix  []byte
+	cache   map[string][]uint64
+	mutex   sync.Mutex
 }
 
 // CreateTable will create a table that stores position markers.
-func CreateTable(db *DB, config TableConfig) (*Table, error) {
+func CreateTable(m *turing.Machine, config TableConfig) (*Table, error) {
 	// check prefix
 	if config.Prefix == "" {
 		panic("quasar: missing prefix")
@@ -33,9 +35,9 @@ func CreateTable(db *DB, config TableConfig) (*Table, error) {
 
 	// create table
 	t := &Table{
-		db:     db,
-		config: config,
-		prefix: append([]byte(config.Prefix), '!'),
+		machine: m,
+		config:  config,
+		prefix:  []byte(config.Prefix),
 	}
 
 	// set cache
@@ -55,34 +57,20 @@ func CreateTable(db *DB, config TableConfig) (*Table, error) {
 func (t *Table) init() error {
 	// load existing positions if cache is available
 	if t.cache != nil {
-		// create iterator
-		iter := t.db.NewIter(prefixIterator(t.prefix))
-		defer iter.Close()
-
-		// compute start
-		start := t.makeKey("")
-
-		// read all keys
-		for iter.SeekGE(start); iter.Valid(); iter.Next() {
-			// parse positions
-			positions, err := DecodeSequences(iter.Value())
-			if err != nil {
-				return err
-			}
-
-			// continue if empty
-			if len(positions) == 0 {
-				continue
-			}
-
-			// cache positions
-			t.cache[string(iter.Key()[len(t.prefix):])] = positions
+		// prepare list
+		list := qis.List{
+			Prefix: t.prefix,
 		}
 
-		// check errors
-		err := iter.Error()
+		// execute list
+		err := t.machine.Execute(&list)
 		if err != nil {
 			return err
+		}
+
+		// cache positions
+		for name, positions := range list.Positions {
+			t.cache[name] = positions
 		}
 	}
 
@@ -95,13 +83,15 @@ func (t *Table) Set(name string, positions []uint64) error {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	// ignore empty positions
-	if len(positions) == 0 {
-		return nil
+	// prepare store
+	store := qis.Store{
+		Prefix:    t.prefix,
+		Name:      []byte(name),
+		Positions: positions,
 	}
 
-	// set entry
-	err := t.db.Set(t.makeKey(name), EncodeSequences(positions), t.db.wo)
+	// execute store
+	err := t.machine.Execute(&store)
 	if err != nil {
 		return err
 	}
@@ -122,32 +112,23 @@ func (t *Table) Get(name string) ([]uint64, error) {
 
 	// get positions from cache if available
 	if t.cache != nil {
-		value, ok := t.cache[name]
-		if !ok {
-			return nil, nil
-		}
-
+		value, _ := t.cache[name]
 		return value, nil
 	}
 
-	// read positions
-	value, closer, err := t.db.Get(t.makeKey(name))
-	if err == pebble.ErrNotFound {
-		return []uint64{}, nil
-	} else if err != nil {
-		return nil, err
+	// prepare load
+	load := qis.Load{
+		Prefix: t.prefix,
+		Name:   []byte(name),
 	}
 
-	// ensure close
-	defer closer.Close()
-
-	// parse key
-	positions, err := DecodeSequences(value)
+	// execute load
+	err := t.machine.Execute(&load)
 	if err != nil {
 		return nil, err
 	}
 
-	return positions, nil
+	return load.Positions, nil
 }
 
 // All will return a map with all stored positions.
@@ -168,52 +149,18 @@ func (t *Table) All() (map[string][]uint64, error) {
 		return table, nil
 	}
 
-	// create iterator
-	iter := t.db.NewIter(prefixIterator(t.prefix))
-	defer iter.Close()
-
-	// compute start
-	start := t.makeKey("")
-
-	// read all keys
-	for iter.SeekGE(start); iter.Valid(); iter.Next() {
-		// parse positions
-		positions, err := DecodeSequences(iter.Value())
-		if err != nil {
-			return nil, err
-		}
-
-		// set positions
-		table[string(iter.Key()[len(t.prefix):])] = positions
+	// prepare list
+	list := qis.List{
+		Prefix: t.prefix,
 	}
 
-	// check errors
-	err := iter.Error()
+	// execute list
+	err := t.machine.Execute(&list)
 	if err != nil {
 		return nil, err
 	}
 
-	return table, nil
-}
-
-// Delete will remove the specified positions from the table.
-func (t *Table) Delete(name string) error {
-	// acquire mutex
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	// delete item
-	err := t.db.Delete(t.makeKey(name), t.db.wo)
-	if err != nil {
-		return err
-	}
-
-	// update cache if available
-	if t.cache != nil {
-		delete(t.cache, name)
-	}
-
-	return nil
+	return list.Positions, nil
 }
 
 // Range will return the range of stored positions and whether there are any
@@ -255,21 +202,19 @@ func (t *Table) Range() (uint64, uint64, bool, error) {
 		return min, max, found, nil
 	}
 
-	// create iterator
-	iter := t.db.NewIter(prefixIterator(t.prefix))
-	defer iter.Close()
+	// prepare list
+	list := qis.List{
+		Prefix: t.prefix,
+	}
 
-	// compute start
-	start := t.makeKey("")
+	// execute list
+	err := t.machine.Execute(&list)
+	if err != nil {
+		return 0, 0, false, err
+	}
 
-	// read all keys
-	for iter.SeekGE(start); iter.Valid(); iter.Next() {
-		// parse positions
-		positions, err := DecodeSequences(iter.Value())
-		if err != nil {
-			return 0, 0, false, err
-		}
-
+	// check positions
+	for _, positions := range list.Positions {
 		// continue if empty
 		if len(positions) == 0 {
 			continue
@@ -287,12 +232,6 @@ func (t *Table) Range() (uint64, uint64, bool, error) {
 
 		// set flag
 		found = true
-	}
-
-	// check errors
-	err := iter.Error()
-	if err != nil {
-		return 0, 0, false, err
 	}
 
 	return min, max, found, nil

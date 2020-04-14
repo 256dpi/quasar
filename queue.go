@@ -3,6 +3,8 @@ package quasar
 import (
 	"fmt"
 	"time"
+
+	"github.com/256dpi/turing"
 )
 
 // QueueConfig is used to configure a queue.
@@ -41,9 +43,9 @@ type Queue struct {
 }
 
 // CreateQueue will create and return a new queue based on the provided settings.
-func CreateQueue(db *DB, config QueueConfig) (*Queue, error) {
+func CreateQueue(m *turing.Machine, config QueueConfig) (*Queue, error) {
 	// create ledger
-	ledger, err := CreateLedger(db, LedgerConfig{
+	ledger, err := CreateLedger(m, LedgerConfig{
 		Prefix: fmt.Sprintf("%s:l", config.Prefix),
 		Cache:  config.LedgerCache,
 		Limit:  config.LedgerLimit,
@@ -53,7 +55,7 @@ func CreateQueue(db *DB, config QueueConfig) (*Queue, error) {
 	}
 
 	// create table
-	table, err := CreateTable(db, TableConfig{
+	table, err := CreateTable(m, TableConfig{
 		Prefix: fmt.Sprintf("%s:t", config.Prefix),
 		Cache:  config.TableCache,
 	})

@@ -8,18 +8,18 @@ import (
 )
 
 func TestTable(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
 	// open
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
 	all, err := table.All()
 	assert.NoError(t, err)
-	assert.Equal(t, map[string][]uint64{}, all)
+	assert.Empty(t, all)
 
 	// set
 
@@ -38,22 +38,22 @@ func TestTable(t *testing.T) {
 
 	assert.Equal(t, map[string]string{
 		"table!foo": "1",
-	}, dump(db))
+	}, dump(m))
 
 	// delete
 
-	err = table.Delete("foo")
+	err = table.Set("foo", nil)
 	assert.NoError(t, err)
 
 	position, err = table.Get("foo")
 	assert.NoError(t, err)
-	assert.Equal(t, []uint64{}, position)
+	assert.Empty(t, position)
 
 	all, err = table.All()
 	assert.NoError(t, err)
 	assert.Equal(t, map[string][]uint64{}, all)
 
-	assert.Equal(t, map[string]string{}, dump(db))
+	assert.Equal(t, map[string]string{}, dump(m))
 
 	// reset
 
@@ -72,12 +72,12 @@ func TestTable(t *testing.T) {
 }
 
 func TestTableCache(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
 	// open
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table", Cache: true})
+	table, err := CreateTable(m, TableConfig{Prefix: "table", Cache: true})
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
@@ -102,11 +102,11 @@ func TestTableCache(t *testing.T) {
 
 	assert.Equal(t, map[string]string{
 		"table!foo": "1",
-	}, dump(db))
+	}, dump(m))
 
 	// delete
 
-	err = table.Delete("foo")
+	err = table.Set("foo", nil)
 	assert.NoError(t, err)
 
 	position, err = table.Get("foo")
@@ -115,9 +115,9 @@ func TestTableCache(t *testing.T) {
 
 	all, err = table.All()
 	assert.NoError(t, err)
-	assert.Equal(t, map[string][]uint64{}, all)
+	assert.Empty(t, map[string][]uint64{}, all)
 
-	assert.Equal(t, map[string]string{}, dump(db))
+	assert.Equal(t, map[string]string{}, dump(m))
 
 	// reset
 
@@ -136,10 +136,10 @@ func TestTableCache(t *testing.T) {
 }
 
 func TestTableRange(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
@@ -179,10 +179,10 @@ func TestTableRange(t *testing.T) {
 }
 
 func TestTableRangeCache(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table", Cache: true})
+	table, err := CreateTable(m, TableConfig{Prefix: "table", Cache: true})
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
@@ -222,14 +222,14 @@ func TestTableRangeCache(t *testing.T) {
 }
 
 func TestTableIsolation(t *testing.T) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	set(db, "foo", "1")
-	set(db, "table!foo", "2")
-	set(db, "z-table!foo", "3")
+	set(m, "foo", "1")
+	set(m, "table!foo", "2")
+	set(m, "z-table!foo", "3")
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
@@ -245,34 +245,30 @@ func TestTableIsolation(t *testing.T) {
 }
 
 func TestTableReopen(t *testing.T) {
-	db := openDB(true)
+	m := startMachine()
+	defer m.Stop()
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
 	err = table.Set("foo", []uint64{1})
 	assert.NoError(t, err)
 
-	closeDB(db)
-	db = openDB(false)
-
-	table, err = CreateTable(db, TableConfig{Prefix: "table"})
+	table, err = CreateTable(m, TableConfig{Prefix: "table"})
 	assert.NoError(t, err)
 	assert.NotNil(t, table)
 
 	position, err := table.Get("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{1}, position)
-
-	closeDB(db)
 }
 
 func BenchmarkTableSet(b *testing.B) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	if err != nil {
 		panic(err)
 	}
@@ -288,15 +284,13 @@ func BenchmarkTableSet(b *testing.B) {
 			panic(err)
 		}
 	}
-
-	b.StopTimer()
 }
 
 func BenchmarkTableGet(b *testing.B) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	if err != nil {
 		panic(err)
 	}
@@ -317,15 +311,13 @@ func BenchmarkTableGet(b *testing.B) {
 			panic(err)
 		}
 	}
-
-	b.StopTimer()
 }
 
 func BenchmarkTableDelete(b *testing.B) {
-	db := openDB(true)
-	defer closeDB(db)
+	m := startMachine()
+	defer m.Stop()
 
-	table, err := CreateTable(db, TableConfig{Prefix: "table"})
+	table, err := CreateTable(m, TableConfig{Prefix: "table"})
 	if err != nil {
 		panic(err)
 	}
@@ -341,11 +333,9 @@ func BenchmarkTableDelete(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		err := table.Delete("foo")
+		err := table.Set("foo", nil)
 		if err != nil {
 			panic(err)
 		}
 	}
-
-	b.StopTimer()
 }

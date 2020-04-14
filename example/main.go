@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/256dpi/god"
+	"github.com/256dpi/turing"
 	"github.com/montanaflynn/stats"
 
 	"github.com/256dpi/quasar"
+	"github.com/256dpi/quasar/seq"
 )
 
 var wg sync.WaitGroup
@@ -38,7 +40,7 @@ func producer(queue *quasar.Queue) {
 	for {
 		// write entry
 		producer.Write(quasar.Entry{
-			Sequence: quasar.GenerateSequence(1),
+			Sequence: seq.Generate(1),
 			Payload:  []byte(time.Now().Format(time.RFC3339Nano)),
 		}, func(err error) {
 			if err != nil {
@@ -142,7 +144,10 @@ func printer(queue *quasar.Queue) {
 
 func main() {
 	// debug
-	god.Debug()
+	god.Init(god.Options{})
+
+	// disable logging
+	turing.SetLogger(nil)
 
 	// get dir
 	dir, err := filepath.Abs("./data")
@@ -156,17 +161,18 @@ func main() {
 		panic(err)
 	}
 
-	// open db
-	db, err := quasar.OpenDB(dir, quasar.DBConfig{
-		SyncWrites: false,
-		// Logger:  log.Printf,
+	// start machine
+	machine, err := turing.Start(turing.Config{
+		Standalone:   true,
+		Directory:    dir,
+		Instructions: quasar.Instructions,
 	})
 	if err != nil {
 		panic(err)
 	}
 
 	// create queue
-	queue, err := quasar.CreateQueue(db, quasar.QueueConfig{
+	queue, err := quasar.CreateQueue(machine, quasar.QueueConfig{
 		Prefix:        "queue",
 		LedgerCache:   500000,
 		LedgerLimit:   500000,

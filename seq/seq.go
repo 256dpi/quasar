@@ -1,4 +1,4 @@
-package quasar
+package seq
 
 import (
 	"bytes"
@@ -12,14 +12,14 @@ var seconds int64
 var counter uint32
 var mutex sync.Mutex
 
-// EncodedSequenceLength defines the expected length of an encoded sequence.
-const EncodedSequenceLength = 20
+// EncodedLength defines the expected length of an encoded sequence.
+const EncodedLength = 20
 
-// GenerateSequence will generate a locally monotonic sequence that consists of
+// Generate will generate a locally monotonic sequence that consists of
 // the current time and an ordinal number. The returned sequence is the first of
 // n consecutive numbers and will either overflow in 2106 or if generated more
 // than ca. 4 billion times a second.
-func GenerateSequence(n uint32) uint64 {
+func Generate(n uint32) uint64 {
 	// acquire mutex
 	mutex.Lock()
 
@@ -39,33 +39,33 @@ func GenerateSequence(n uint32) uint64 {
 	mutex.Unlock()
 
 	// compute first number
-	first := JoinSequence(time.Unix(seconds, 0), counter-n)
+	first := Join(time.Unix(seconds, 0), counter-n)
 
 	return first
 }
 
-// JoinSequence constructs a sequence from a 32 bit timestamp and 32 bit ordinal
+// Join constructs a sequence from a 32 bit timestamp and 32 bit ordinal
 // number.
-func JoinSequence(ts time.Time, n uint32) uint64 {
+func Join(ts time.Time, n uint32) uint64 {
 	return uint64(ts.Unix())<<32 | uint64(n)
 }
 
-// SplitSequence explodes the sequence in its timestamp and ordinal number.
-func SplitSequence(s uint64) (time.Time, uint32) {
+// Split explodes the sequence in its timestamp and ordinal number.
+func Split(s uint64) (time.Time, uint32) {
 	ts := time.Unix(int64(s>>32), 0)
 	return ts, uint32(s & 0xFFFFFFFF)
 }
 
-// EncodeSequence will encode a sequence.
-func EncodeSequence(s uint64, compact bool) []byte {
+// Encode will encode a sequence.
+func Encode(s uint64, compact bool) []byte {
 	// prepare buffer
-	buf := make([]byte, EncodedSequenceLength*2)
+	buf := make([]byte, EncodedLength*2)
 
 	// encode number
-	res := strconv.AppendUint(buf[EncodedSequenceLength:EncodedSequenceLength], s, 10)
+	res := strconv.AppendUint(buf[EncodedLength:EncodedLength], s, 10)
 
 	// return directly if compact or full
-	if compact || len(res) >= EncodedSequenceLength {
+	if compact || len(res) >= EncodedLength {
 		return res
 	}
 
@@ -73,30 +73,30 @@ func EncodeSequence(s uint64, compact bool) []byte {
 	start := len(res)
 
 	// writes zeroes
-	for i := start; i < start+EncodedSequenceLength-len(res); i++ {
+	for i := start; i < start+EncodedLength-len(res); i++ {
 		buf[i] = '0'
 	}
 
 	// slice number
-	res = buf[start : start+EncodedSequenceLength]
+	res = buf[start : start+EncodedLength]
 
 	return res
 }
 
-// DecodeSequence will decode a sequence.
-func DecodeSequence(key []byte) (uint64, error) {
+// Decode will decode a sequence.
+func Decode(key []byte) (uint64, error) {
 	return strconv.ParseUint(toString(key), 10, 64)
 }
 
-// EncodeSequences will encode a list of compacted sequences.
-func EncodeSequences(list []uint64) []byte {
+// EncodeList will encode a list of compacted sequences.
+func EncodeList(list []uint64) []byte {
 	// check length
 	if len(list) == 0 {
 		return nil
 	}
 
 	// prepare buffer
-	buf := make([]byte, 0, len(list)*(EncodedSequenceLength+1))
+	buf := make([]byte, 0, len(list)*(EncodedLength+1))
 
 	// add sequences
 	for _, item := range list {
@@ -107,8 +107,8 @@ func EncodeSequences(list []uint64) []byte {
 	return buf[:len(buf)-1]
 }
 
-// DecodeSequences will decode a list of compacted sequences.
-func DecodeSequences(value []byte) ([]uint64, error) {
+// DecodeList will decode a list of compacted sequences.
+func DecodeList(value []byte) ([]uint64, error) {
 	// prepare list
 	list := make([]uint64, 0, bytes.Count(value, []byte(","))+1)
 
@@ -136,11 +136,11 @@ func DecodeSequences(value []byte) ([]uint64, error) {
 	return list, nil
 }
 
-// CompileSequences will compile a list of positive sequences from the provided
+// Compile will compile a list of positive sequences from the provided
 // mark table. It will compress positive adjacent tail sequences and inject a
 // fake positive sequence at the beginning if the first entry in the table is
 // negative.
-func CompileSequences(table map[uint64]bool) []uint64 {
+func Compile(table map[uint64]bool) []uint64 {
 	// compile lists
 	var all = make([]uint64, 0, len(table))
 	var set = make([]uint64, 0, len(table))
