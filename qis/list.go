@@ -27,7 +27,7 @@ func (s *List) Effect() int {
 	return 0
 }
 
-func (s *List) Execute(mem turing.Memory) error {
+func (s *List) Execute(mem turing.Memory, _ turing.Cache) error {
 	// get key
 	key, ref := makeTableKey(s.Prefix, nil)
 	defer ref.Release()

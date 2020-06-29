@@ -15,7 +15,7 @@ func startMachine() *turing.Machine {
 	return turing.Test(
 		&qis.Write{}, &qis.Read{}, &qis.Stat{}, &qis.Trim{},
 		&qis.List{}, &qis.Store{}, &qis.Load{},
-		&stdset.Set{}, &stdset.Map{},
+		&stdset.Set{}, &stdset.Dump{},
 	)
 }
 
@@ -31,18 +31,12 @@ func set(m *turing.Machine, key, value string) {
 }
 
 func dump(m *turing.Machine) map[string]string {
-	// map keys
-	mp := &stdset.Map{}
+	// dump keys
+	mp := &stdset.Dump{}
 	err := m.Execute(mp)
 	if err != nil {
 		panic(err)
 	}
 
-	// build map
-	data := map[string]string{}
-	for key, value := range mp.Pairs {
-		data[key] = string(value)
-	}
-
-	return data
+	return mp.Map
 }

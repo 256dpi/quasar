@@ -26,7 +26,7 @@ func (t *Trim) Effect() int {
 	return 1
 }
 
-func (t *Trim) Execute(mem turing.Memory) error {
+func (t *Trim) Execute(mem turing.Memory, _ turing.Cache) error {
 	// get head
 	head, err := readSeq(mem, t.Prefix, headSuffix)
 	if err != nil {

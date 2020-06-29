@@ -31,7 +31,7 @@ func (w *Write) Effect() int {
 	return len(w.Entries) + 1
 }
 
-func (w *Write) Execute(mem turing.Memory) error {
+func (w *Write) Execute(mem turing.Memory, _ turing.Cache) error {
 	// get head
 	head, err := readSeq(mem, w.Prefix, headSuffix)
 	if err != nil {

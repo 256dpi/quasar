@@ -25,7 +25,7 @@ func (s *Stat) Effect() int {
 	return 0
 }
 
-func (s *Stat) Execute(mem turing.Memory) error {
+func (s *Stat) Execute(mem turing.Memory, _ turing.Cache) error {
 	// get head
 	head, err := readSeq(mem, s.Prefix, headSuffix)
 	if err != nil {

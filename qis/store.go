@@ -28,7 +28,7 @@ func (s *Store) Effect() int {
 	return 1
 }
 
-func (s *Store) Execute(mem turing.Memory) error {
+func (s *Store) Execute(mem turing.Memory, _ turing.Cache) error {
 	// get key
 	key, ref := makeTableKey(s.Prefix, s.Name)
 	defer ref.Release()

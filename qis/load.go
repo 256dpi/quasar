@@ -28,7 +28,7 @@ func (s *Load) Effect() int {
 	return 0
 }
 
-func (s *Load) Execute(mem turing.Memory) error {
+func (s *Load) Execute(mem turing.Memory, _ turing.Cache) error {
 	// get key
 	key, ref := makeTableKey(s.Prefix, s.Name)
 	defer ref.Release()

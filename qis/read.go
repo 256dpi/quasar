@@ -34,7 +34,7 @@ func (r *Read) Effect() int {
 	return 0
 }
 
-func (r *Read) Execute(mem turing.Memory) error {
+func (r *Read) Execute(mem turing.Memory, _ turing.Cache) error {
 	// prepare prefix
 	prefix, prefixRef := coding.Concat(r.Prefix, entrySuffix)
 	defer prefixRef.Release()
