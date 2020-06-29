@@ -48,13 +48,16 @@ func (w *Write) Execute(mem turing.Memory, _ turing.Cache) error {
 
 		// prepare entry key
 		entryKey, entryRef := joinEntryKey(w.Prefix, w.Head)
-		defer entryRef.Release()
 
 		// set entry
 		err = mem.Set(entryKey, entry)
 		if err != nil {
+			entryRef.Release()
 			return err
 		}
+
+		// release
+		entryRef.Release()
 	}
 
 	// write head
