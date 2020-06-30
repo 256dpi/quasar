@@ -1,6 +1,6 @@
 module example
 
-go 1.12
+go 1.14
 
 require (
 	github.com/256dpi/god v0.4.3

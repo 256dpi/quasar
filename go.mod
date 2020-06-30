@@ -1,6 +1,6 @@
 module github.com/256dpi/quasar
 
-go 1.12
+go 1.14
 
 require (
 	github.com/256dpi/turing v0.0.0-20200629194643-4b5f2a5f81a8

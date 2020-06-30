@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"os"
 	"os/signal"
@@ -14,7 +15,6 @@ import (
 	"github.com/montanaflynn/stats"
 
 	"github.com/256dpi/quasar"
-	"github.com/256dpi/quasar/seq"
 )
 
 var wg sync.WaitGroup
@@ -27,7 +27,7 @@ var mutex sync.Mutex
 func producer(queue *quasar.Queue) {
 	// create producer
 	producer := queue.Producer(quasar.ProducerConfig{
-		Batch:   turing.MaxEffect-1,
+		Batch:   turing.MaxEffect - 1,
 		Timeout: time.Millisecond,
 		Retry:   100, // 10s
 		Delay:   100 * time.Millisecond,
@@ -40,8 +40,7 @@ func producer(queue *quasar.Queue) {
 	for {
 		// write entry
 		producer.Write(quasar.Entry{
-			Sequence: seq.Generate(1),
-			Payload:  []byte(time.Now().Format(time.RFC3339Nano)),
+			Payload: time2Bin(time.Now()),
 		}, func(err error) {
 			if err != nil {
 				panic(err)
@@ -57,7 +56,7 @@ func producer(queue *quasar.Queue) {
 
 func consumer(queue *quasar.Queue) {
 	// prepare channels
-	entries := make(chan quasar.Entry, 5000)
+	entries := make(chan quasar.Entry, 25_000)
 
 	// create consumer
 	consumer := queue.Consumer(quasar.ConsumerConfig{
@@ -66,9 +65,9 @@ func consumer(queue *quasar.Queue) {
 		Errors: func(err error) {
 			panic(err)
 		},
-		Batch:    25000,
-		Window:   50000,
-		Skip:     25000,
+		Batch:    25_000,
+		Window:   50_000,
+		Skip:     25_000,
 		Timeout:  time.Second,
 		Deadline: 10 * time.Second,
 	})
@@ -76,12 +75,10 @@ func consumer(queue *quasar.Queue) {
 	// ensure closing
 	defer consumer.Close()
 
-	for {
-		// receive entry
-		entry := <-entries
-
+	// receive entries
+	for entry := range entries {
 		// get timestamp
-		ts, _ := time.Parse(time.RFC3339Nano, string(entry.Payload))
+		ts := bin2Time(entry.Payload)
 
 		// calculate diff
 		diff := float64(time.Since(ts)) / float64(time.Millisecond)
@@ -174,8 +171,8 @@ func main() {
 	// create queue
 	queue, err := quasar.CreateQueue(machine, quasar.QueueConfig{
 		Prefix:        "queue",
-		LedgerCache:   500000,
-		LedgerLimit:   500000,
+		LedgerCache:   500_000,
+		LedgerLimit:   500_000,
 		TableCache:    true,
 		CleanInterval: 500 * time.Millisecond,
 		CleanErrors: func(err error) {
@@ -199,4 +196,16 @@ func main() {
 
 	// just exit
 	os.Exit(0)
+}
+
+func time2Bin(t time.Time) []byte {
+	u := uint64(t.UnixNano())
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, u)
+	return b
+}
+
+func bin2Time(b []byte) time.Time {
+	i := int64(binary.BigEndian.Uint64(b))
+	return time.Unix(0, i)
 }
