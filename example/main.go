@@ -27,7 +27,7 @@ var mutex sync.Mutex
 func producer(queue *quasar.Queue) {
 	// create producer
 	producer := queue.Producer(quasar.ProducerConfig{
-		Batch:   turing.MaxEffect - 1,
+		Batch:   10_000 - 1,
 		Timeout: time.Millisecond,
 		Retry:   100, // 10s
 		Delay:   100 * time.Millisecond,

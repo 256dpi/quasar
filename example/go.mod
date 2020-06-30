@@ -5,7 +5,7 @@ go 1.14
 require (
 	github.com/256dpi/god v0.4.3
 	github.com/256dpi/quasar v0.0.0
-	github.com/256dpi/turing v0.0.0-20200629194643-4b5f2a5f81a8
+	github.com/256dpi/turing v0.0.0-20200630074246-efd36e7f189f
 	github.com/montanaflynn/stats v0.5.0
 )
 
