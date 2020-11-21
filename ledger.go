@@ -372,19 +372,19 @@ func (l *Ledger) Unsubscribe(receiver chan<- uint64) {
 	delete(l.receivers, receiver)
 }
 
-func (l *Ledger) onPush(push *qis.Write) {
+func (l *Ledger) onPush(write *qis.Write) {
 	// cache entries if available
 	if l.cache != nil {
-		for i, entry := range push.Entries {
+		for i, entry := range write.Entries {
 			l.cache.Push(Entry{
-				Sequence: push.Head - uint64(len(push.Entries)-(i+1)),
+				Sequence: write.Head - uint64(len(write.Entries)-(i+1)),
 				Payload:  entry,
 			})
 		}
 	}
 
 	// update head
-	l.head = push.Head
+	l.head = write.Head
 
 	// send notifications to all receivers and skip full receivers
 	for receiver := range l.receivers {
@@ -395,16 +395,16 @@ func (l *Ledger) onPush(push *qis.Write) {
 	}
 }
 
-func (l *Ledger) onDelete(delete *qis.Trim) {
+func (l *Ledger) onDelete(trim *qis.Trim) {
 	// remove deleted entries from cache
 	if l.cache != nil {
 		l.cache.Trim(func(entry Entry) bool {
-			return entry.Sequence <= delete.Sequence
+			return entry.Sequence <= trim.Sequence
 		})
 	}
 
 	// set tail
-	l.tail = delete.Sequence
+	l.tail = trim.Sequence
 }
 
 type ledgerObserver struct {

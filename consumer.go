@@ -329,9 +329,9 @@ func (c *Consumer) worker() error {
 
 			// mark all lower sequences if cumulative
 			if tuple.cum {
-				for seq := range markers {
-					if seq < tuple.seq {
-						markers[seq] = true
+				for msq := range markers {
+					if msq < tuple.seq {
+						markers[msq] = true
 					}
 				}
 			}
@@ -364,9 +364,9 @@ func (c *Consumer) worker() error {
 			}
 
 			// compress markers
-			for seq := range markers {
-				if seq < list[0] {
-					delete(markers, seq)
+			for msq := range markers {
+				if msq < list[0] {
+					delete(markers, msq)
 				}
 			}
 
@@ -396,9 +396,9 @@ func (c *Consumer) worker() error {
 			}
 
 			// compress markers
-			for seq := range markers {
-				if seq < list[0] {
-					delete(markers, seq)
+			for msq := range markers {
+				if msq < list[0] {
+					delete(markers, msq)
 				}
 			}
 
