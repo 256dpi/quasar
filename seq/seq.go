@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"sort"
 	"strconv"
+	"unsafe"
 )
 
 // EncodedLength defines the expected length of an encoded sequence.
@@ -38,7 +39,10 @@ func Encode(s uint64, compact bool) []byte {
 
 // Decode will decode a sequence.
 func Decode(key []byte) (uint64, error) {
-	return strconv.ParseUint(toString(key), 10, 64)
+	// get string without copying
+	str := *(*string)(unsafe.Pointer(&key))
+
+	return strconv.ParseUint(str, 10, 64)
 }
 
 // EncodeList will encode a list of compacted sequences.
@@ -74,7 +78,7 @@ func DecodeList(value []byte) ([]uint64, error) {
 		}
 
 		// parse item
-		item, err := strconv.ParseUint(toString(value[i:i+index]), 10, 64)
+		item, err := Decode(value[i:i+index])
 		if err != nil {
 			return nil, err
 		}
