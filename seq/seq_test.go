@@ -3,42 +3,9 @@ package seq
 import (
 	"math"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
-
-func TestGenerateSequence(t *testing.T) {
-	start1 := Generate(100)
-	assert.True(t, start1 > 0)
-
-	start2 := Generate(100)
-	assert.Equal(t, start1+100, start2)
-}
-
-func TestSplitAndJoinSequence(t *testing.T) {
-	now, err := time.Parse(time.RFC3339, "2019-05-02T12:05:42+03:00")
-	assert.NoError(t, err)
-
-	seq := Join(now, 42)
-	assert.Equal(t, uint64(6686353297697144874), seq)
-
-	ts, n := Split(seq)
-
-	assert.Equal(t, now.UTC(), ts.UTC())
-	assert.Equal(t, uint32(42), n)
-}
-
-func TestSequenceProperties(t *testing.T) {
-	ts, n := Split(0)
-	assert.Equal(t, time.Unix(0, 0), ts)
-	assert.Equal(t, uint32(0), n)
-
-	ts, n = Split(math.MaxUint64)
-	end, _ := time.Parse(time.RFC3339, "2106-02-07T06:28:15+00:00")
-	assert.True(t, end.UTC().Equal(ts.UTC()))
-	assert.Equal(t, uint32(math.MaxUint32), n)
-}
 
 func TestEncodeAndDecodeSequence(t *testing.T) {
 	key := Encode(0, true)
@@ -148,14 +115,6 @@ func TestCompileSequences(t *testing.T) {
 	for i, item := range table {
 		l := Compile(item.m)
 		assert.Equal(t, item.l, l, "test %d", i)
-	}
-}
-
-func BenchmarkGenerateSequence(b *testing.B) {
-	b.ReportAllocs()
-
-	for i := 0; i < b.N; i++ {
-		Generate(100)
 	}
 }
 
