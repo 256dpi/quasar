@@ -78,7 +78,7 @@ func DecodeList(value []byte) ([]uint64, error) {
 		}
 
 		// parse item
-		item, err := Decode(value[i:i+index])
+		item, err := Decode(value[i : i+index])
 		if err != nil {
 			return nil, err
 		}

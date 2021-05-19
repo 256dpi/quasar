@@ -11,7 +11,9 @@ func BenchmarkPush(b *testing.B) {
 
 	push := &Write{
 		Prefix: []byte("foo"),
-		Entry:  []byte("bar"),
+		Entries: [][]byte{
+			[]byte("bar"),
+		},
 	}
 
 	b.ReportAllocs()
