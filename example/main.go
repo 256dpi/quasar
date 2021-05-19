@@ -49,7 +49,7 @@ func producer(queue *quasar.Queue) {
 
 		// increment
 		mutex.Lock()
-		send += 1
+		send++
 		mutex.Unlock()
 	}
 }
