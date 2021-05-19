@@ -3,8 +3,8 @@ package qis
 import (
 	"encoding/binary"
 
+	"github.com/256dpi/fpack"
 	"github.com/256dpi/turing"
-	"github.com/256dpi/turing/coding"
 )
 
 var headSuffix = []byte("!head")
@@ -13,7 +13,7 @@ var entrySuffix = []byte("#")
 
 func readSeq(mem turing.Memory, prefix, suffix []byte) (uint64, error) {
 	// get key
-	key, ref := coding.Concat(prefix, suffix)
+	key, ref := fpack.Concat(prefix, suffix)
 	defer ref.Release()
 
 	// get sequence
@@ -31,7 +31,7 @@ func readSeq(mem turing.Memory, prefix, suffix []byte) (uint64, error) {
 
 func writeSeq(mem turing.Memory, prefix, suffix []byte, seq uint64) error {
 	// get key
-	key, ref := coding.Concat(prefix, suffix)
+	key, ref := fpack.Concat(prefix, suffix)
 	defer ref.Release()
 
 	// encode sequence
@@ -47,9 +47,9 @@ func writeSeq(mem turing.Memory, prefix, suffix []byte, seq uint64) error {
 	return nil
 }
 
-func joinEntryKey(prefix []byte, seq uint64) ([]byte, *coding.Ref) {
+func joinEntryKey(prefix []byte, seq uint64) ([]byte, *fpack.Ref) {
 	// borrow buffer
-	buf, ref := coding.Borrow(len(prefix) + 1 + 8)
+	buf, ref := fpack.Borrow(len(prefix) + 1 + 8)
 
 	// write prefix
 	copy(buf, prefix)
@@ -71,9 +71,9 @@ func splitEntryKey(key []byte) ([]byte, uint64) {
 	return prefix, seq
 }
 
-func makeTableKey(prefix, name []byte) ([]byte, *coding.Ref) {
+func makeTableKey(prefix, name []byte) ([]byte, *fpack.Ref) {
 	// borrow buffer
-	buf, ref := coding.Borrow(len(prefix) + 1 + len(name))
+	buf, ref := fpack.Borrow(len(prefix) + 1 + len(name))
 
 	// write prefix
 	copy(buf, prefix)

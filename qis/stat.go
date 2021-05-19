@@ -3,8 +3,8 @@ package qis
 import (
 	"fmt"
 
+	"github.com/256dpi/fpack"
 	"github.com/256dpi/turing"
-	"github.com/256dpi/turing/coding"
 )
 
 type Stat struct {
@@ -46,7 +46,7 @@ func (s *Stat) Execute(mem turing.Memory, _ turing.Cache) error {
 }
 
 func (s *Stat) Encode() ([]byte, turing.Ref, error) {
-	return coding.Encode(true, func(enc *coding.Encoder) error {
+	return fpack.Encode(true, func(enc *fpack.Encoder) error {
 		// encode version
 		enc.Uint8(1)
 
@@ -59,7 +59,7 @@ func (s *Stat) Encode() ([]byte, turing.Ref, error) {
 }
 
 func (s *Stat) Decode(bytes []byte) error {
-	return coding.Decode(bytes, func(dec *coding.Decoder) error {
+	return fpack.Decode(bytes, func(dec *fpack.Decoder) error {
 		// decode version
 		var version uint8
 		dec.Uint8(&version)
